@@ -1,11 +1,15 @@
+A="/c/Program Files/AMD APP"
 LLVMBIN=/c/cygwin/home/nakamura/llvm/build/mingw-static/Release+Asserts/bin
 CC=$(LLVMBIN)/clang.exe
-CFLAGS=-O3 -Wall
+I=-I $A
+CFLAGS=-O3 -Wall $I/include
+LDFLAGS=-L $A/lib/x86
+LDLIBS=-lOpenCL
 
 .PRECIOUS: %.bc %.ll %.s %.link.ll %.lopt.ll
 
 %.exe: %.s
-	$(CC) -o $@ $^
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 %.bc: %.c
 	$(CC) -MMD $(CFLAGS) $< -o $@ -emit-llvm
