@@ -54,9 +54,9 @@ unsigned kadj(unsigned a)
 
 unsigned kadjL(unsigned a)
 {
-	a &= 0x7F;
+	a &= 0x3F;
 	a += 0x40;
-	if (a >= 0x7F) a += (0xA1 - 0x7F);
+	if (a >= 0x7A) a += (0xA6 - 0x7A);
 	return a;
 }
 
