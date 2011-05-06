@@ -6,9 +6,7 @@
 #include <stdlib.h>
 #include <malloc.h>
 #include <sys/time.h>
-
 #include <inttypes.h>
-//#include "sha1_32.h"
 
 #include "gty.cl"
 
@@ -255,7 +253,7 @@ void gpu(void *arg)
 
 int main()
 {
-#define UPDATE_INTERVAL 8	/* 速度表示の間隔 秒 */
+#define UPDATE_INTERVAL 5	/* 速度表示の間隔 秒 */
   struct status {
     uint64_t startTime;	/* 開始時刻 ミリ秒 */
     uint64_t lastTime;	/* 最後に表示した時刻 ミリ秒 */
@@ -273,6 +271,11 @@ int main()
  LOOP_FACTOR が平均速度より十分小さければ、ほぼ指定間隔になる。
  LOOP_FACTOR * UINT32_MAX + LOOP_FACOTR 個検索するとオーバーフローする。ｗ
  */
+
+#if 0
+  /* タゲ読み込み */
+  struct ITREE *root_expr = expr_parse("target.txt");
+#endif
 
 	gmutex = CreateMutex(NULL, FALSE, NULL);
 	WaitForSingleObject(gmutex, INFINITE);
