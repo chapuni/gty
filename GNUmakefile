@@ -35,7 +35,7 @@ LDLIBS=-lOpenCL
 	$(LLVMBIN)/opt -stats -std-link-opts $< -o $@
 
 gty.lopt.exe: gty.lopt.s
-gty.link.bc: gty.ll sha1_32.ll
+gty.link.bc: gty.ll #sha1_32.ll
 
 -include *.d
 
