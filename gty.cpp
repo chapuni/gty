@@ -40,6 +40,19 @@ static const char *const kernel_src[] = {
 	"}",
 };
 
+unsigned kadj(unsigned a)
+{
+    a &= 0x7F;
+    a += 0x40;
+    if (a >= 0x7F) a += (0x89 - 0x7F);
+    if (a >= 0x98) a += (0xA6 - 0x98);
+    return a;
+}
+
+unsigned k24(unsigned a) {
+    return (kadj(a >> 14) << 24) | (kadj(a >> 7) << 16) | (kadj(a) << 8) | 0x80;
+}
+
 void gpu()
 {
 	int i;
@@ -82,10 +95,16 @@ void gpu()
 		printf("queue=%d\n", status);
 
 		/* source */
+		static char srcbuf[262144];
+		FILE *sfp = fopen("gty.cl", "r");
+		size_t srcsiz = fread(srcbuf, 1, sizeof(srcbuf), sfp);
+		fclose(sfp);
+		srcbuf[srcsiz] = 0;
+		static char *srcp[] = {srcbuf};
 		cl_program program
 			= clCreateProgramWithSource(ctx[i],
-										sizeof(kernel_src) / sizeof(*kernel_src),
-										(const char **)kernel_src,
+										sizeof(srcp) / sizeof(*srcp),
+										(const char **)srcp,
 										NULL,
 										&status);
 		printf("createProgram(%d)=%d\n",
@@ -104,7 +123,7 @@ void gpu()
 								  sizeof(szs),
 								  (void *)szs,
 								  &szsz);
-		unsigned char bbuf[65536];
+		unsigned char bbuf[524288];
 		unsigned char *pbuf[] = {bbuf};
 		printf("ssz=%d->%d p=%p st=%d\n", szsz, szs[0], pbuf[0], status);
 		size_t bsz;
@@ -133,17 +152,24 @@ void gpu()
 #endif
 		kernel[i] = clCreateKernel(program, "gpuMain", &status);
 		printf("createkernel=%d\n", status);
-
-		static int data[256];
+#define N (128 * 128)
+		static int data[N];
 		cl_mem ary = clCreateBuffer(ctx[i],
 									CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
 									sizeof(data), &data, NULL);
 		clSetKernelArg(kernel[i], 0, sizeof(cl_mem), (void*)&ary);
-		static size_t worksize[] = {256};
+		static size_t worksize[] = {N};
 		clEnqueueNDRangeKernel(queue[i], kernel[i], 1, NULL, worksize, NULL, 0, NULL, NULL);
 		clEnqueueReadBuffer(queue[i], ary, CL_TRUE, 0, sizeof(data), data, 0, NULL, NULL);
-		for (int j = 0; j < 256; j++)
-			printf("%5d: %08X\n", j, data[j]);
+		for (int j = 0; j < N; j++) {
+			static uint32_t h[5];
+			sha1_32(h,
+					0x55555555, 0x55555555, 0x55555555, 0x55555555,
+					0x55555555, 0x55555555, 0x55555555, 0x55555555,
+					0x55555555, 0x55555555, 0x55555555, 0x55555555,
+					0x55555555, k24(j), 0x00000000, 0x000001B8);
+			printf("%5d: %08X (should be %08X)\n", j, data[j], h[0]);
+		}
 
 	}
 }
@@ -151,16 +177,27 @@ void gpu()
 int main()
 {
 	static uint32_t h[5];
-
+#if 0
 	sha1_32(h,
 			   0x55555555, 0x55555555, 0x55555555, 0x80000000,
 			   0x00000000, 0x00000000, 0x00000000, 0x00000000,
 			   0x00000000, 0x00000000, 0x00000000, 0x00000000,
 			   0x00000000, 0x00000000, 0x00000000, 0x00000060);
-
 	printf("7CA678DA 749193EC 305EE9A0 5E5BD477 8AD4F786: should be\n"
 		   "%08X %08X %08X %08X %08X\n",
 		   h[0], h[1], h[2], h[3], h[4]);
+#else
+	sha1_32(h,
+			   0x55555555, 0x55555555, 0x55555555, 0x55555555,
+			   0x55555555, 0x55555555, 0x55555555, 0x55555555,
+			   0x55555555, 0x55555555, 0x55555555, 0x55555555,
+			   0x55555555, 0x55555580, 0x00000000, 0x000001B8);
+	printf("1E80779D 0E0D29A5 BAACAB03: should be\n"
+		   "%08X %08X %08X %08X %08X\n",
+		   h[0], h[1], h[2], h[3], h[4]);
+
+#endif
+
 	print_key_hash(stdout, h);
 
 	gpu();
