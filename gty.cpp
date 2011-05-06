@@ -1,4 +1,6 @@
 #include <CL/cl.h>
+#include <windows.h>
+#include <process.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,6 +11,11 @@
 //#include "sha1_32.h"
 
 #include "gty.cl"
+
+static HANDLE gmutex;
+static unsigned loop_cpu[64];
+static unsigned loop_gpu[64];
+static int f_wipe;
 
 static
 void dec64(char *h5, uint32_t h)
@@ -45,7 +52,7 @@ static const char *const kernel_src[] = {
 	"}",
 };
 #endif
-void gpu()
+void gpu(void *arg)
 {
 	int i;
 	cl_int status;
@@ -157,13 +164,18 @@ void gpu()
 		gettimeofday(&t1, NULL);
 		static size_t worksize[] = {N};
 		int iter;
-		for (iter = 0; iter < 8 * 1024; iter++) {
+		WaitForSingleObject(gmutex, INFINITE);
+		srand(time(NULL));
+		ReleaseMutex(gmutex);
+
+		while (1) {
 			k0 = k32(rand() ^ (rand() << 8) ^ (rand() << 16));
 			k2 = k32L(rand() ^ (rand() << 8) ^ (rand() << 16));
 			clSetKernelArg(kernel[i], 1, sizeof(k0), (void*)&k0);
 			clSetKernelArg(kernel[i], 2, sizeof(k2), (void*)&k2);
 			clEnqueueNDRangeKernel(queue[i], kernel[i], 1, NULL, worksize, NULL, 0, NULL, NULL);
 			data = (W*)clEnqueueMapBuffer(queue[i], ary, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, N * sizeof(*data), 0, NULL, NULL, NULL);
+			loop_gpu[0] += (W4 ? 4 : 1) * 32 * N;
 			for (int j = 0; j < N; j++) {
 				unsigned a = data[j];
 				if (!a) continue;
@@ -176,8 +188,13 @@ void gpu()
 							0x00000000, 0x00000000, 0x00000000, 0x00000000,
 							0x00000000, 0x00000000, 0x00000000, 0x00000000,
 							0x00000000, 0x00000000, 0x00000000, 0x00000060);
-					print_key_hash(stdout, h);
-					printf(" #%c%c%c%c%c%c%c%c%c%c%c%c\n",
+					WaitForSingleObject(gmutex, INFINITE);
+					if (f_wipe) {
+						fprintf(stderr, "                                                                               \r");
+						f_wipe = 0;
+					}
+					print_key_hash(stderr, h);
+					fprintf(stderr, " #%c%c%c%c%c%c%c%c%c%c%c%c\n",
 						   (k0 >> 24) & 0xFF,
 						   (k0 >> 16) & 0xFF,
 						   (k0 >>  8) & 0xFF,
@@ -190,6 +207,7 @@ void gpu()
 						   (k2 >> 16) & 0xFF,
 						   (k2 >>  8) & 0xFF,
 						   (k2 >>  0) & 0xFF);
+					ReleaseMutex(gmutex);
 				}
 			}
 			clEnqueueUnmapMemObject(queue[i], ary, (void*)data, 0, NULL, NULL);
@@ -237,34 +255,94 @@ void gpu()
 
 int main()
 {
-	static uint32_t h[5];
+#define UPDATE_INTERVAL 8	/* 速度表示の間隔 秒 */
+  struct status {
+    uint64_t startTime;	/* 開始時刻 ミリ秒 */
+    uint64_t lastTime;	/* 最後に表示した時刻 ミリ秒 */
+    uint64_t loop;		/* 総検索個数 */
+    uint64_t loopgpu;
+    uint64_t lastloop;	/* 最後に表示した時の loop */
+    uint64_t lastgpu;
+  } status;
+  uint64_t curTime;
+  uint32_t upd_int = 0;
+/*
+ 平均速度 (trips/s) * UPDATE_INTERVAL が UINT32_MAX を超えると発狂する。
+ UINT32_MAX = 4294967295, 平均速度 = 100Mtrips/s なら、
+ 4294967295 / (100 * 1000 * 1000) = 42.949 秒まで。（和良
+ LOOP_FACTOR が平均速度より十分小さければ、ほぼ指定間隔になる。
+ LOOP_FACTOR * UINT32_MAX + LOOP_FACOTR 個検索するとオーバーフローする。ｗ
+ */
+
+	gmutex = CreateMutex(NULL, FALSE, NULL);
+	WaitForSingleObject(gmutex, INFINITE);
+
+	_beginthread(gpu, 262144, NULL);
+
+	struct timeval tv;
+	memset( &status, 0, sizeof( struct status ) );
+	gettimeofday(&tv, NULL);
+	status.startTime = status.lastTime = 1000000ULL * tv.tv_sec + tv.tv_usec;
+
+	ReleaseMutex(gmutex);
+	while (1)
+	{
+		int n_gpus = 1;
+		int n_cpus = 0;
+		double USEC_SEC = 1000000.0;
+		Sleep(5000);
+	  /* 速度計測 */
+		int i;
+	  status.loop = status.loopgpu = 0;
+	  for (i = 0; i < n_cpus; i++) status.loop += loop_cpu[i];
+	  for (i = 0; i < n_gpus; i++) status.loopgpu += loop_gpu[i];
+
+	  gettimeofday(&tv, NULL);
+	  curTime = 1000000ULL * tv.tv_sec + tv.tv_usec;
+	  if (status.loop + status.loopgpu >= status.lastloop + upd_int
+		  && curTime != status.lastTime)
+		{
+		  uint64_t diffTime;
+		  int a, b, c, g;
 #if 0
-	sha1_32(h,
-			   0x55555555, 0x55555555, 0x55555555, 0x80000000,
-			   0x00000000, 0x00000000, 0x00000000, 0x00000000,
-			   0x00000000, 0x00000000, 0x00000000, 0x00000000,
-			   0x00000000, 0x00000000, 0x00000000, 0x00000060);
-	printf("7CA678DA 749193EC 305EE9A0 5E5BD477 8AD4F786: should be\n"
-		   "%08X %08X %08X %08X %08X\n",
-		   h[0], h[1], h[2], h[3], h[4]);
-#else
-	sha1_32(h,
-			   0x55555555, 0x55555555, 0x55555555, 0x55555555,
-			   0x55555555, 0x55555555, 0x55555555, 0x55555555,
-			   0x55555555, 0x55555555, 0x55555555, 0x55555555,
-			   0x55555555, 0x55555580, 0x00000000, 0x000001B8);
-	printf("1E80779D 0E0D29A5 BAACAB03: should be\n"
-		   "%08X %08X %08X %08X %08X\n",
-		   h[0], h[1], h[2], h[3], h[4]);
-
+		  WaitForSingleObject(mutex_key, INFINITE);
+		  status.loop += xxxcnt;
+		  xxxcnt = 0;
+		  ReleaseMutex(mutex_key);
 #endif
+		  /* 通算(単位 ktrips/sec) */
+		  diffTime = curTime - status.startTime;
+		  a = (status.loop + status.loopgpu) / ((1000 / USEC_SEC) * diffTime);
 
-	print_key_hash(stdout, h);
-	printf("\n");
-	srand(time(NULL));
-	gpu();
+		  /* 区間(単位 trips/sec) */
+		  diffTime = curTime - status.lastTime;
+		  b = USEC_SEC * (status.loop - status.lastloop) / diffTime;
 
-	return 0;
+		  diffTime = curTime - status.lastTime;
+		  g = USEC_SEC * (status.loopgpu - status.lastgpu) / diffTime;
+
+		  /* 予測 */
+		  c = UPDATE_INTERVAL * (b + g);
+
+		  /* 立ち上がりなど、誤差があり upd_int が小さすぎたときは
+			 いきなり全補正せず 1 秒(==b)づつ収斂させる。 */
+		  upd_int = (upd_int + b + g < c
+					 ? upd_int + b + g
+					 : c);
+
+		  status.lastTime = curTime;
+		  status.lastloop = status.loop;
+		  status.lastgpu = status.loopgpu;
+		  WaitForSingleObject(gmutex, INFINITE);
+		  fprintf(stderr,
+				  "%4d.%03dGtrips/s [%4d.%06dMtrips/s@CPU %4d.%06dMtrips/s@GPU]\r",
+				  a / 1000000, (a / 1000) % 1000,
+				  b / 1000000, b % 1000000,
+				  g / 1000000, g % 1000000);
+		  f_wipe++;
+		  ReleaseMutex(gmutex);
+		}
+	}
 }
 
 /*
