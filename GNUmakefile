@@ -8,7 +8,7 @@ CXXFLAGS=$(CFLAGS)
 LDFLAGS=-L $A/lib/x86
 LDLIBS=-lOpenCL
 
-.PRECIOUS: %.bc %.ll %.s %.link.ll %.lopt.ll
+.PRECIOUS: %.c %.bc %.ll %.s %.link.ll %.lopt.ll
 
 %.exe: %.s
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
@@ -34,8 +34,14 @@ LDLIBS=-lOpenCL
 %.lopt.ll: %.link.bc
 	$(LLVMBIN)/opt -stats -std-link-opts $< -o $@
 
+%.c: %.y
+	bison -o $@ $<
+
+%.c: %.lex
+	flex -o$@ -v $<
+
 gty.lopt.exe: gty.lopt.s
-gty.link.bc: gty.ll #sha1_32.ll
+gty.link.bc: gty.ll #expr_parse.ll synth.ll wdict.ll
 
 -include *.d
 
