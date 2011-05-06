@@ -10,7 +10,7 @@ unsigned f0(unsigned b,
 			unsigned c,
 			unsigned d)
 {
-	return 0x5A827999U + ((b & c) + (~b & d));
+	return 0x5A827999U + ((c & b) | (d & ~b));
 }
 
 
