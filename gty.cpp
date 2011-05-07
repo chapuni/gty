@@ -36,7 +36,7 @@ void print_key_hash(FILE *fp, const uint32_t *h)
 	dec64(&hstr[ 5], (h[0] << 30) | (h[1] >> 2));
 	dec64(&hstr[10], (h[1] << 28) | (h[2] >> 4));
 	hstr[12] = 0;
-	fprintf(fp, "◆%s", hstr);
+	fprintf(fp, "\x81\x9F%s", hstr);
 }
 
 static cl_uint numDevices;
