@@ -462,3 +462,9 @@ void gpuMain(__global uint4 *Ary)
 #endif
 
 #endif
+
+/*
+ *	Local Variables:
+ *		tab-width:	4
+ *	End:
+ */
