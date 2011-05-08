@@ -331,18 +331,20 @@ void tr32(const unsigned *in, unsigned *out)
 }
 
 unsigned b64e(unsigned a) {
-	a &= 63;
-	a += 'A';
-	if (a > 'Z')
-		a += 'a' - 'Z' + 1;
-	if (a > 'z')
-		a += '.' - 'z' + 1;
-	if (a > '.')
-		a += '/' - '.' + 1;
+	if ('.' <= a && a <= '/')
+		a -= '.' - 076;
+	else if ('0' <= a && a <= '9')
+		a -= '0' - 064;
+	else if ('A' <= a && a <= 'Z')
+		a -= 'A';
+	else if ('a' <= a && a <= 'z')
+		a -= 'a' - 032;
+	else
+		a = 076;
 	return a;
 }
 
-int cmp8(unsigned a, unsigned b,
+unsigned cmp8(unsigned a, unsigned b,
 		 int s0, int s1, int s2, int s3,
 		 int s4, int s5, int s6, int s7)
 {
@@ -350,12 +352,52 @@ int cmp8(unsigned a, unsigned b,
 					| (b64e(s1) << 20)
 					| (b64e(s2) << 14)
 					| (b64e(s3) << 8)
-					| (b64e(s4) >> 4));
-	unsigned s47 = ((b64e(s4) << 28)
-					| (b64e(s5) << 22)
-					| (b64e(s6) << 16)
-					| (b64e(s7) << 10));
-	return (a == s04) && ((b & 0xFFFFFC00) == s47);
+					| (b64e(s4) << 2)
+					| (b64e(s5) >> 4));
+	unsigned s47 = ((b64e(s5) << 28)
+					| (b64e(s6) << 22)
+					| (b64e(s7) << 16));
+	return (a == s04
+			&& (b & 0xFFFF0000) == s47);
+}
+
+unsigned cmps(unsigned a, unsigned b)
+{
+	return (0
+#if 0
+			|| cmp8(a, b, '9','T','/','M','E','P','C','/')
+			|| cmp8(a, b, 'l','u','c','i','f','e','r','.')
+			|| cmp8(a, b, 'l','u','c','i','f','e','r','/')
+			|| cmp8(a, b, 'm','o','a','i','7','7','7','.')
+			|| cmp8(a, b, '/','/','H','A','G','E','/','/')
+			|| cmp8(a, b, 'i','i','i','i','z','z','z','.')
+			|| cmp8(a, b, 'i','i','i','i','z','z','z','/')
+			|| cmp8(a, b, 'S','e','t','s','u','n','a','.')
+			|| cmp8(a, b, 'T','i','t','a','n','i','u','m')
+			|| cmp8(a, b, 'N','a','k','o','c','h','i','.')
+			|| cmp8(a, b, 'N','a','k','o','c','h','i','/')
+#endif
+			|| cmp8(a, b, 'D','e','a','d','m','a','u','5')
+			|| cmp8(a, b, 's','/','s','a','k','i','/','n')
+			|| cmp8(a, b, 'G','l','a','c','e','o','n','.')
+			|| cmp8(a, b, 'G','l','a','c','e','o','n','/')
+			|| cmp8(a, b, 'I','K','A','m','u','s','u','m')
+#if 0
+			|| cmp8(a, b, 'h','a','y','a','b','u','s','a')
+			|| cmp8(a, b, 'K','A','M','A','T','A','6','9')
+			|| cmp8(a, b, 'k','a','m','a','t','a','6','9')
+			|| cmp8(a, b, 'V','e','r','o','n','i','c','a')
+			|| cmp8(a, b, 'K','a','z','u','o','.','.','.')
+			|| cmp8(a, b, 'G','.','o','n','a','n','u','.')
+			|| cmp8(a, b, 'N','A','N','O','N','A','N','O')
+			|| cmp8(a, b, 'L','o','v','e','/','y','.','s')
+			|| cmp8(a, b, 's','e','r','i','/','.','.','s')
+			|| cmp8(a, b, 'Y','U','T','O','K','O','.','.')
+			|| cmp8(a, b, 'Y','u','t','o','k','o','.','.')
+			|| cmp8(a, b, 'y','u','t','o','k','o','.','.')
+			|| cmp8(a, b, 'C','o','l','l','a','p','s','e')
+#endif
+		);
 }
 
 #define W4 0
@@ -380,6 +422,7 @@ void gpuMain(__global W *Ary,
 	W t[32];
 
 	unsigned h[5];
+	W m = 0;
 	for (i = 0; i < 32; i++) {
 #if W4
 		sha1_32(h,
@@ -412,8 +455,14 @@ void gpuMain(__global W *Ary,
 				0x00000000, 0x00000000, 0x00000000, 0x00000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000060);
+#if 1
+		m >>= 1;
+		if (cmps(h[0], h[1]))
+			m |= 0x80000000;
+#else
 		a[i] = h[0];
 		b[i] = h[1];
+#endif
 #endif
 	}
 
@@ -421,8 +470,8 @@ void gpuMain(__global W *Ary,
 #if 1
 	x = 0;
 	for (i = 0; i < 32; i++) {
-		if (cmp8(a[i], b[i],
-				 'm', 'o', 'a', 'i', '7', '7', '7', '.'))
+		if (0
+			)
 			x ^= 1U << i;
 	}
 #else
@@ -433,7 +482,7 @@ void gpuMain(__global W *Ary,
 	x = ~x;
 #endif
 
-	Ary[id] = x;
+	Ary[id] = m;
 }
 #else
 __kernel
