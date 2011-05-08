@@ -11,8 +11,8 @@
 #include "gty.cl"
 
 static HANDLE gmutex;
-static unsigned loop_cpu[64];
-static unsigned loop_gpu[64];
+static uint64_t loop_cpu[64];
+static uint64_t loop_gpu[64];
 static int f_wipe;
 
 static
@@ -34,7 +34,7 @@ void print_key_hash(FILE *fp, const uint32_t *h)
 	dec64(&hstr[ 5], (h[0] << 30) | (h[1] >> 2));
 	dec64(&hstr[10], (h[1] << 28) | (h[2] >> 4));
 	hstr[12] = 0;
-	fprintf(fp, "Ÿ%s", hstr);
+	fprintf(fp, "\x81\x9F%s", hstr);
 }
 
 static cl_uint numDevices;
@@ -253,23 +253,23 @@ void gpu(void *arg)
 
 int main()
 {
-#define UPDATE_INTERVAL 5	/* ‘¬“x•\¦‚ÌŠÔŠu •b */
+#define UPDATE_INTERVAL 5	/* é€Ÿåº¦è¡¨ç¤ºã®é–“éš” ç§’ */
   struct status {
-    uint64_t startTime;	/* ŠJn ƒ~ƒŠ•b */
-    uint64_t lastTime;	/* ÅŒã‚É•\¦‚µ‚½ ƒ~ƒŠ•b */
-    uint64_t loop;		/* ‘ŒŸõŒÂ” */
+    uint64_t startTime;	/* é–‹å§‹æ™‚åˆ» ãƒŸãƒªç§’ */
+    uint64_t lastTime;	/* æœ€å¾Œã«è¡¨ç¤ºã—ãŸæ™‚åˆ» ãƒŸãƒªç§’ */
+    uint64_t loop;		/* ç·æ¤œç´¢å€‹æ•° */
     uint64_t loopgpu;
-    uint64_t lastloop;	/* ÅŒã‚É•\¦‚µ‚½‚Ì loop */
+    uint64_t lastloop;	/* æœ€å¾Œã«è¡¨ç¤ºã—ãŸæ™‚ã® loop */
     uint64_t lastgpu;
   } status;
   uint64_t curTime;
   uint32_t upd_int = 0;
 /*
- •½‹Ï‘¬“x (trips/s) * UPDATE_INTERVAL ‚ª UINT32_MAX ‚ğ’´‚¦‚é‚Æ”­‹¶‚·‚éB
- UINT32_MAX = 4294967295, •½‹Ï‘¬“x = 100Mtrips/s ‚È‚çA
- 4294967295 / (100 * 1000 * 1000) = 42.949 •b‚Ü‚ÅBi˜a—Ç
- LOOP_FACTOR ‚ª•½‹Ï‘¬“x‚æ‚è\•ª¬‚³‚¯‚ê‚ÎA‚Ù‚Úw’èŠÔŠu‚É‚È‚éB
- LOOP_FACTOR * UINT32_MAX + LOOP_FACOTR ŒÂŒŸõ‚·‚é‚ÆƒI[ƒo[ƒtƒ[‚·‚éB‚—
+ å¹³å‡é€Ÿåº¦ (trips/s) * UPDATE_INTERVAL ãŒ UINT32_MAX ã‚’è¶…ãˆã‚‹ã¨ç™ºç‹‚ã™ã‚‹ã€‚
+ UINT32_MAX = 4294967295, å¹³å‡é€Ÿåº¦ = 100Mtrips/s ãªã‚‰ã€
+ 4294967295 / (100 * 1000 * 1000) = 42.949 ç§’ã¾ã§ã€‚ï¼ˆå’Œè‰¯
+ LOOP_FACTOR ãŒå¹³å‡é€Ÿåº¦ã‚ˆã‚Šååˆ†å°ã•ã‘ã‚Œã°ã€ã»ã¼æŒ‡å®šé–“éš”ã«ãªã‚‹ã€‚
+ LOOP_FACTOR * UINT32_MAX + LOOP_FACOTR å€‹æ¤œç´¢ã™ã‚‹ã¨ã‚ªãƒ¼ãƒãƒ¼ãƒ•ãƒ­ãƒ¼ã™ã‚‹ã€‚ï½—
  */
 
 #if 0
@@ -294,7 +294,7 @@ int main()
 		int n_cpus = 0;
 		double USEC_SEC = 1000000.0;
 		Sleep(5000);
-	  /* ‘¬“xŒv‘ª */
+	  /* é€Ÿåº¦è¨ˆæ¸¬ */
 		int i;
 	  status.loop = status.loopgpu = 0;
 	  for (i = 0; i < n_cpus; i++) status.loop += loop_cpu[i];
@@ -313,22 +313,22 @@ int main()
 		  xxxcnt = 0;
 		  ReleaseMutex(mutex_key);
 #endif
-		  /* ’ÊZ(’PˆÊ ktrips/sec) */
+		  /* é€šç®—(å˜ä½ ktrips/sec) */
 		  diffTime = curTime - status.startTime;
 		  a = (status.loop + status.loopgpu) / ((1000 / USEC_SEC) * diffTime);
 
-		  /* ‹æŠÔ(’PˆÊ trips/sec) */
+		  /* åŒºé–“(å˜ä½ trips/sec) */
 		  diffTime = curTime - status.lastTime;
 		  b = USEC_SEC * (status.loop - status.lastloop) / diffTime;
 
 		  diffTime = curTime - status.lastTime;
 		  g = USEC_SEC * (status.loopgpu - status.lastgpu) / diffTime;
 
-		  /* —\‘ª */
+		  /* äºˆæ¸¬ */
 		  c = UPDATE_INTERVAL * (b + g);
 
-		  /* —§‚¿ã‚ª‚è‚È‚ÇAŒë·‚ª‚ ‚è upd_int ‚ª¬‚³‚·‚¬‚½‚Æ‚«‚Í
-			 ‚¢‚«‚È‚è‘S•â³‚¹‚¸ 1 •b(==b)‚Ã‚ÂûÊ‚³‚¹‚éB */
+		  /* ç«‹ã¡ä¸ŠãŒã‚Šãªã©ã€èª¤å·®ãŒã‚ã‚Š upd_int ãŒå°ã•ã™ããŸã¨ãã¯
+			 ã„ããªã‚Šå…¨è£œæ­£ã›ãš 1 ç§’(==b)ã¥ã¤åæ–‚ã•ã›ã‚‹ã€‚ */
 		  upd_int = (upd_int + b + g < c
 					 ? upd_int + b + g
 					 : c);

@@ -330,6 +330,34 @@ void tr32(const unsigned *in, unsigned *out)
 	out[0x1F] = a1F;
 }
 
+unsigned b64e(unsigned a) {
+	a &= 63;
+	a += 'A';
+	if (a > 'Z')
+		a += 'a' - 'Z' + 1;
+	if (a > 'z')
+		a += '.' - 'z' + 1;
+	if (a > '.')
+		a += '/' - '.' + 1;
+	return a;
+}
+
+int cmp8(unsigned a, unsigned b,
+		 int s0, int s1, int s2, int s3,
+		 int s4, int s5, int s6, int s7)
+{
+	unsigned s04 = ((b64e(s0) << 26)
+					| (b64e(s1) << 20)
+					| (b64e(s2) << 14)
+					| (b64e(s3) << 8)
+					| (b64e(s4) >> 4));
+	unsigned s47 = ((b64e(s4) << 28)
+					| (b64e(s5) << 22)
+					| (b64e(s6) << 16)
+					| (b64e(s7) << 10));
+	return (a == s04) && ((b & 0xFFFFFC00) == s47);
+}
+
 #define W4 0
 
 #ifdef __OPENCL_VERSION__
@@ -348,7 +376,7 @@ void gpuMain(__global W *Ary,
 {
 	unsigned i;
 	unsigned id = get_global_id(0);
-	W a[32];
+	W a[32], b[32];
 	W t[32];
 
 	unsigned h[5];
@@ -385,19 +413,24 @@ void gpuMain(__global W *Ary,
 				0x00000000, 0x00000000, 0x00000000, 0x00000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000060);
 		a[i] = h[0];
+		b[i] = h[1];
 #endif
 	}
 
+	W x;
 #if 1
+	x = 0;
+	for (i = 0; i < 32; i++) {
+		if (cmp8(a[i], b[i],
+				 'm', 'o', 'a', 'i', '7', '7', '7', '.'))
+			x ^= 1U << i;
+	}
+#else
 	tr32(a, t);
-	W x = t[31];
+	x = t[31];
 	for (i = 1; i < 30; i++)
 		x |= t[31 - i];
 	x = ~x;
-#else
-	W x = a[0];
-	for (i = 1; i < 32; i++)
-		x ^= a[i];
 #endif
 
 	Ary[id] = x;
@@ -462,3 +495,9 @@ void gpuMain(__global uint4 *Ary)
 #endif
 
 #endif
+
+/*
+ *	Local Variables:
+ *		tab-width:	4
+ *	End:
+ */
