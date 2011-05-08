@@ -273,7 +273,6 @@ int main()
  */
 
 #if 0
-  /* É^ÉQì«Ç›çûÇ› */
   struct ITREE *root_expr = expr_parse("target.txt");
 #endif
 
