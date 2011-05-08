@@ -374,7 +374,7 @@ sha1_32_1(T *hash,
 		T k08, T k09, T k10, T k11, T k12, T k13, T k14, T k15)
 {
 	T t01 = k01;
-	t01 = 0;
+	k01 = 0;
 	T k16 = ROL(1, k00 ^ k02 ^ k08 ^ k13);
 	T k17 = ROL(1, k01 ^ k03 ^ k09 ^ k14);
 	T k18 = ROL(1, k02 ^ k04 ^ k10 ^ k15);
@@ -717,6 +717,52 @@ void gpuMain(__global W *Ary,
 				   k[50], k[51], k[52], k[53], k[54], k[55], k[56], k[57], k[58], k[59],
 				   k[60], k[61], k[62], k[63], k[64], k[65], k[66], k[67], k[68], k[69],
 				   k[70], k[71], k[72], k[73], k[74], k[75], k[76], k[77], k[78], k[79]);
+#if 1
+		m >>= 1;
+		if (cmps(h[0], h[1]))
+			m |= 0x80000000;
+#else
+		a[i] = h[0];
+		b[i] = h[1];
+#endif
+	}
+
+	W x;
+#if 1
+	x = 0;
+	for (i = 0; i < 32; i++) {
+		if (0
+			)
+			x ^= 1U << i;
+	}
+#else
+	tr32(a, t);
+	x = t[31];
+	for (i = 1; i < 30; i++)
+		x |= t[31 - i];
+	x = ~x;
+#endif
+
+	Ary[id] = m;
+}
+#elif 1
+__kernel
+void gpuMain(__global W *Ary,
+			 __constant T k[80])
+{
+	unsigned i;
+	unsigned id = get_global_id(0);
+	W a[32], b[32];
+	W t[32];
+
+	T h[5];
+	W m = 0;
+	for (i = 0; i < 32; i++) {
+		sha1_32_1(h,
+				  k[00], key32((id << 5) + i), k[02], 0x80000000,
+				  0x00000000, 0x00000000, 0x00000000, 0x00000000,
+				  0x00000000, 0x00000000, 0x00000000, 0x00000000,
+				  0x00000000, 0x00000000, 0x00000000, 0x00000060);
 #if 1
 		m >>= 1;
 		if (cmps(h[0], h[1]))
