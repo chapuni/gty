@@ -109,7 +109,7 @@ void gpu(void *arg)
 			   status);
 		status = clBuildProgram(program,
 								0, NULL,
-								"-fbin-source -fbin-llvmir -fbin-amdil -fbin-exe",
+								"-O3 -fbin-source -fbin-llvmir -fbin-amdil -fbin-exe",
 								NULL,
 								NULL);
 		printf("build=%d\n", status);
@@ -155,9 +155,31 @@ void gpu(void *arg)
 									CL_MEM_ALLOC_HOST_PTR,
 									N * sizeof(W), NULL, NULL);
 		clSetKernelArg(kernel[i], 0, sizeof(cl_mem), (void*)&ary);
+#if 1
+		cl_mem kkey = clCreateBuffer(ctx[i],
+									 CL_MEM_ALLOC_HOST_PTR,
+									 80 * sizeof(W), NULL, NULL);
+		clSetKernelArg(kernel[i], 1, sizeof(cl_mem), (void*)&kkey);
+#else
 		unsigned k0;
 		unsigned k1;
 		unsigned k2;
+#endif
+
+#if 1
+		W *keys;
+		keys = (W*)clEnqueueMapBuffer(queue[i], kkey, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, 80 * sizeof(*keys), 0, NULL, NULL, NULL);
+		assert(keys);
+		for (int j = 0; j < 80; j++) keys[j] = 0;
+		keys[ 3] = 0x80000000;
+		keys[15] = 0x00000060;
+		clEnqueueUnmapMemObject(queue[i], kkey, (void*)keys, 0, NULL, NULL);
+#else
+		unsigned keys[80];
+		for (int j = 0; j < 80; j++) keys[j] = 0;
+		keys[ 3] = 0x80000000;
+		keys[15] = 0x00000060;
+#endif
 		struct timeval t1, t2;
 		gettimeofday(&t1, NULL);
 		static size_t worksize[] = {N};
@@ -167,10 +189,17 @@ void gpu(void *arg)
 		ReleaseMutex(gmutex);
 
 		while (1) {
-			k0 = k32(rand() ^ (rand() << 8) ^ (rand() << 16));
-			k2 = k32L(rand() ^ (rand() << 8) ^ (rand() << 16));
+			keys = (W*)clEnqueueMapBuffer(queue[i], kkey, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, 80 * sizeof(*keys), 0, NULL, NULL, NULL);
+			assert(keys);
+			keys[0] = key32(rand() ^ (rand() << 8) ^ (rand() << 16));
+			keys[2] = k32L(rand() ^ (rand() << 8) ^ (rand() << 16));
+			for (int j = 16; j < 80; j++)
+			  keys[j] = ROL(1, keys[j - 16] ^ keys[j - 14] ^ keys[j - 8] ^ keys[j - 3]);
+			clEnqueueUnmapMemObject(queue[i], kkey, (void*)keys, 0, NULL, NULL);
+#if 0
 			clSetKernelArg(kernel[i], 1, sizeof(k0), (void*)&k0);
 			clSetKernelArg(kernel[i], 2, sizeof(k2), (void*)&k2);
+#endif
 			clEnqueueNDRangeKernel(queue[i], kernel[i], 1, NULL, worksize, NULL, 0, NULL, NULL);
 			data = (W*)clEnqueueMapBuffer(queue[i], ary, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, N * sizeof(*data), 0, NULL, NULL, NULL);
 			loop_gpu[0] += (W4 ? 4 : 1) * 32 * N;
@@ -179,7 +208,9 @@ void gpu(void *arg)
 				if (!a) continue;
 				for (int k = 0; k < 32; k++) {
 					if (!(a & (1U << k))) continue;
-					unsigned k1 = k32((j << 5 + 2 * W4) + k);
+					unsigned k0 = keys[0];
+					unsigned k1 = key32((j << 5 + 2 * W4) + k);
+					unsigned k2 = keys[2];
 					unsigned h[5];
 					sha1_32(h,
 							k0, k1, k2, 0x80000000,
@@ -223,7 +254,7 @@ void gpu(void *arg)
 				static uint32_t h[5];
 #if 1
 				sha1_32(h,
-						k0, k1, k32((j << (5 + 2 * W4)) + k), 0x80000000,
+						k0, k1, key32((j << (5 + 2 * W4)) + k), 0x80000000,
 						0x00000000, 0x00000000, 0x00000000, 0x00000000,
 						0x00000000, 0x00000000, 0x00000000, 0x00000000,
 						0x00000000, 0x00000000, 0x00000000, 0x00000060);

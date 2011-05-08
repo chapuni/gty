@@ -1,38 +1,60 @@
 /* -*-C-*- */
 
+#define W4 0
+
 #ifdef __OPENCL_VERSION__
-#define ROL(n,a) rotate(a,n)
+
+typedef unsigned T;
+
+#if W4
+typedef uint4 W;
 #else
-#define ROL(n,a) (unsigned)(((a) << (n)) | ((unsigned)(a) >> (32 - (n))))
+typedef unsigned W;
 #endif
 
-unsigned f0(unsigned b,
-			unsigned c,
-			unsigned d)
+#define ROL(n,a) rotate(a,n)
+
+#else
+
+typedef cl_uint T;
+
+#if W4
+typedef cl_uint4 W;
+#else
+typedef cl_uint W;
+#endif
+
+#define ROL(n,a) (T)(((a) << (n)) | ((T)(a) >> (32 - (n))))
+
+#endif
+
+T f0(T b,
+			T c,
+			T d)
 {
 	return 0x5A827999U + ((c & b) | (d & ~b));
 }
 
 
-unsigned f1(unsigned b,
-			unsigned c,
-			unsigned d)
+T f1(T b,
+			T c,
+			T d)
 {
 	return 0x6ED9EBA1U + (b ^ c ^ d);
 }
 
 
-unsigned f2(unsigned b,
-			unsigned c,
-			unsigned d)
+T f2(T b,
+			T c,
+			T d)
 {
 	return 0x8F1BBCDCU + ((b & c) | (c & d) | (d & b));
 }
 
 
-unsigned f3(unsigned b,
-			unsigned c,
-			unsigned d)
+T f3(T b,
+			T c,
+			T d)
 {
 	return 0xCA62C1D6U + (b ^ c ^ d);
 }
@@ -43,7 +65,7 @@ unsigned f3(unsigned b,
 A6-DD 56
 */
 
-unsigned kadj(unsigned a)
+T kadj(T a)
 {
 	a &= 0x7F;
 	a += 0x40;
@@ -52,7 +74,7 @@ unsigned kadj(unsigned a)
 	return a;
 }
 
-unsigned kadjL(unsigned a)
+T kadjL(T a)
 {
 	a &= 0x3F;
 	a += 0x40;
@@ -60,26 +82,31 @@ unsigned kadjL(unsigned a)
 	return a;
 }
 
-unsigned k24(unsigned a) {
+T k24(T a) {
 	return (kadj(a >> 14) << 24) | (kadj(a >> 7) << 16) | (kadj(a) << 8) | 0x80;
 }
 
-unsigned k32(unsigned a) {
+T key32(T a) {
 	return (kadj(a >> 21) << 24) | (kadj(a >> 14) << 16) | (kadj(a >> 7) << 8) | kadj(a);
 }
 
-unsigned k32L(unsigned a) {
+T k32L(T a) {
 	return (kadj(a >> 21) << 24) | (kadj(a >> 14) << 16) | (kadj(a >> 7) << 8) | kadjL(a);
 }
 
-void sha1_32(unsigned *hash,
-			 unsigned k00, unsigned k01, unsigned k02, unsigned k03,
-			 unsigned k04, unsigned k05, unsigned k06, unsigned k07,
-			 unsigned k08, unsigned k09, unsigned k0A, unsigned k0B,
-			 unsigned k0C, unsigned k0D, unsigned k0E, unsigned k0F)
+void
+sha1_k80(T *hash,
+		T k00, T k01, T k02, T k03, T k04, T k05, T k06, T k07, T k08, T k09,
+		T k10, T k11, T k12, T k13, T k14, T k15, T k16, T k17, T k18, T k19,
+		T k20, T k21, T k22, T k23, T k24, T k25, T k26, T k27, T k28, T k29,
+		T k30, T k31, T k32, T k33, T k34, T k35, T k36, T k37, T k38, T k39,
+		T k40, T k41, T k42, T k43, T k44, T k45, T k46, T k47, T k48, T k49,
+		T k50, T k51, T k52, T k53, T k54, T k55, T k56, T k57, T k58, T k59,
+		T k60, T k61, T k62, T k63, T k64, T k65, T k66, T k67, T k68, T k69,
+		T k70, T k71, T k72, T k73, T k74, T k75, T k76, T k77, T k78, T k79)
 {
-	unsigned a, b, c, d, e;
-	unsigned t;
+	T a, b, c, d, e;
+	T t;
 
 	a = 0x67452301U;
 	b = 0xEFCDAB89U;
@@ -97,121 +124,383 @@ void sha1_32(unsigned *hash,
 	t = ROL(5, a) + f0(b, c, d) + e + k07; e = d; d = c; c = ROL(30, b); b = a; a = t;
 	t = ROL(5, a) + f0(b, c, d) + e + k08; e = d; d = c; c = ROL(30, b); b = a; a = t;
 	t = ROL(5, a) + f0(b, c, d) + e + k09; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	t = ROL(5, a) + f0(b, c, d) + e + k0A; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	t = ROL(5, a) + f0(b, c, d) + e + k0B; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	t = ROL(5, a) + f0(b, c, d) + e + k0C; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	t = ROL(5, a) + f0(b, c, d) + e + k0D; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	t = ROL(5, a) + f0(b, c, d) + e + k0E; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	t = ROL(5, a) + f0(b, c, d) + e + k0F; e = d; d = c; c = ROL(30, b); b = a; a = t;
-
-	k00 = ROL(1, k00 ^ k02 ^ k08 ^ k0D); t = ROL(5, a) + f0(b, c, d) + e + k00; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k01 = ROL(1, k01 ^ k03 ^ k09 ^ k0E); t = ROL(5, a) + f0(b, c, d) + e + k01; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k02 = ROL(1, k02 ^ k04 ^ k0A ^ k0F); t = ROL(5, a) + f0(b, c, d) + e + k02; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k03 = ROL(1, k03 ^ k05 ^ k0B ^ k00); t = ROL(5, a) + f0(b, c, d) + e + k03; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k04 = ROL(1, k04 ^ k06 ^ k0C ^ k01); t = ROL(5, a) + f1(b, c, d) + e + k04; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k05 = ROL(1, k05 ^ k07 ^ k0D ^ k02); t = ROL(5, a) + f1(b, c, d) + e + k05; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k06 = ROL(1, k06 ^ k08 ^ k0E ^ k03); t = ROL(5, a) + f1(b, c, d) + e + k06; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k07 = ROL(1, k07 ^ k09 ^ k0F ^ k04); t = ROL(5, a) + f1(b, c, d) + e + k07; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k08 = ROL(1, k08 ^ k0A ^ k00 ^ k05); t = ROL(5, a) + f1(b, c, d) + e + k08; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k09 = ROL(1, k09 ^ k0B ^ k01 ^ k06); t = ROL(5, a) + f1(b, c, d) + e + k09; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0A = ROL(1, k0A ^ k0C ^ k02 ^ k07); t = ROL(5, a) + f1(b, c, d) + e + k0A; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0B = ROL(1, k0B ^ k0D ^ k03 ^ k08); t = ROL(5, a) + f1(b, c, d) + e + k0B; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0C = ROL(1, k0C ^ k0E ^ k04 ^ k09); t = ROL(5, a) + f1(b, c, d) + e + k0C; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0D = ROL(1, k0D ^ k0F ^ k05 ^ k0A); t = ROL(5, a) + f1(b, c, d) + e + k0D; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0E = ROL(1, k0E ^ k00 ^ k06 ^ k0B); t = ROL(5, a) + f1(b, c, d) + e + k0E; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0F = ROL(1, k0F ^ k01 ^ k07 ^ k0C); t = ROL(5, a) + f1(b, c, d) + e + k0F; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k00 = ROL(1, k00 ^ k02 ^ k08 ^ k0D); t = ROL(5, a) + f1(b, c, d) + e + k00; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k01 = ROL(1, k01 ^ k03 ^ k09 ^ k0E); t = ROL(5, a) + f1(b, c, d) + e + k01; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k02 = ROL(1, k02 ^ k04 ^ k0A ^ k0F); t = ROL(5, a) + f1(b, c, d) + e + k02; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k03 = ROL(1, k03 ^ k05 ^ k0B ^ k00); t = ROL(5, a) + f1(b, c, d) + e + k03; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k04 = ROL(1, k04 ^ k06 ^ k0C ^ k01); t = ROL(5, a) + f1(b, c, d) + e + k04; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k05 = ROL(1, k05 ^ k07 ^ k0D ^ k02); t = ROL(5, a) + f1(b, c, d) + e + k05; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k06 = ROL(1, k06 ^ k08 ^ k0E ^ k03); t = ROL(5, a) + f1(b, c, d) + e + k06; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k07 = ROL(1, k07 ^ k09 ^ k0F ^ k04); t = ROL(5, a) + f1(b, c, d) + e + k07; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k08 = ROL(1, k08 ^ k0A ^ k00 ^ k05); t = ROL(5, a) + f2(b, c, d) + e + k08; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k09 = ROL(1, k09 ^ k0B ^ k01 ^ k06); t = ROL(5, a) + f2(b, c, d) + e + k09; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0A = ROL(1, k0A ^ k0C ^ k02 ^ k07); t = ROL(5, a) + f2(b, c, d) + e + k0A; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0B = ROL(1, k0B ^ k0D ^ k03 ^ k08); t = ROL(5, a) + f2(b, c, d) + e + k0B; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0C = ROL(1, k0C ^ k0E ^ k04 ^ k09); t = ROL(5, a) + f2(b, c, d) + e + k0C; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0D = ROL(1, k0D ^ k0F ^ k05 ^ k0A); t = ROL(5, a) + f2(b, c, d) + e + k0D; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0E = ROL(1, k0E ^ k00 ^ k06 ^ k0B); t = ROL(5, a) + f2(b, c, d) + e + k0E; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0F = ROL(1, k0F ^ k01 ^ k07 ^ k0C); t = ROL(5, a) + f2(b, c, d) + e + k0F; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k00 = ROL(1, k00 ^ k02 ^ k08 ^ k0D); t = ROL(5, a) + f2(b, c, d) + e + k00; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k01 = ROL(1, k01 ^ k03 ^ k09 ^ k0E); t = ROL(5, a) + f2(b, c, d) + e + k01; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k02 = ROL(1, k02 ^ k04 ^ k0A ^ k0F); t = ROL(5, a) + f2(b, c, d) + e + k02; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k03 = ROL(1, k03 ^ k05 ^ k0B ^ k00); t = ROL(5, a) + f2(b, c, d) + e + k03; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k04 = ROL(1, k04 ^ k06 ^ k0C ^ k01); t = ROL(5, a) + f2(b, c, d) + e + k04; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k05 = ROL(1, k05 ^ k07 ^ k0D ^ k02); t = ROL(5, a) + f2(b, c, d) + e + k05; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k06 = ROL(1, k06 ^ k08 ^ k0E ^ k03); t = ROL(5, a) + f2(b, c, d) + e + k06; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k07 = ROL(1, k07 ^ k09 ^ k0F ^ k04); t = ROL(5, a) + f2(b, c, d) + e + k07; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k08 = ROL(1, k08 ^ k0A ^ k00 ^ k05); t = ROL(5, a) + f2(b, c, d) + e + k08; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k09 = ROL(1, k09 ^ k0B ^ k01 ^ k06); t = ROL(5, a) + f2(b, c, d) + e + k09; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0A = ROL(1, k0A ^ k0C ^ k02 ^ k07); t = ROL(5, a) + f2(b, c, d) + e + k0A; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0B = ROL(1, k0B ^ k0D ^ k03 ^ k08); t = ROL(5, a) + f2(b, c, d) + e + k0B; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0C = ROL(1, k0C ^ k0E ^ k04 ^ k09); t = ROL(5, a) + f3(b, c, d) + e + k0C; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0D = ROL(1, k0D ^ k0F ^ k05 ^ k0A); t = ROL(5, a) + f3(b, c, d) + e + k0D; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0E = ROL(1, k0E ^ k00 ^ k06 ^ k0B); t = ROL(5, a) + f3(b, c, d) + e + k0E; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0F = ROL(1, k0F ^ k01 ^ k07 ^ k0C); t = ROL(5, a) + f3(b, c, d) + e + k0F; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k00 = ROL(1, k00 ^ k02 ^ k08 ^ k0D); t = ROL(5, a) + f3(b, c, d) + e + k00; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k01 = ROL(1, k01 ^ k03 ^ k09 ^ k0E); t = ROL(5, a) + f3(b, c, d) + e + k01; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k02 = ROL(1, k02 ^ k04 ^ k0A ^ k0F); t = ROL(5, a) + f3(b, c, d) + e + k02; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k03 = ROL(1, k03 ^ k05 ^ k0B ^ k00); t = ROL(5, a) + f3(b, c, d) + e + k03; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k04 = ROL(1, k04 ^ k06 ^ k0C ^ k01); t = ROL(5, a) + f3(b, c, d) + e + k04; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k05 = ROL(1, k05 ^ k07 ^ k0D ^ k02); t = ROL(5, a) + f3(b, c, d) + e + k05; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k06 = ROL(1, k06 ^ k08 ^ k0E ^ k03); t = ROL(5, a) + f3(b, c, d) + e + k06; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k07 = ROL(1, k07 ^ k09 ^ k0F ^ k04); t = ROL(5, a) + f3(b, c, d) + e + k07; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k08 = ROL(1, k08 ^ k0A ^ k00 ^ k05); t = ROL(5, a) + f3(b, c, d) + e + k08; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k09 = ROL(1, k09 ^ k0B ^ k01 ^ k06); t = ROL(5, a) + f3(b, c, d) + e + k09; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0A = ROL(1, k0A ^ k0C ^ k02 ^ k07); t = ROL(5, a) + f3(b, c, d) + e + k0A; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0B = ROL(1, k0B ^ k0D ^ k03 ^ k08); t = ROL(5, a) + f3(b, c, d) + e + k0B; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0C = ROL(1, k0C ^ k0E ^ k04 ^ k09); t = ROL(5, a) + f3(b, c, d) + e + k0C; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0D = ROL(1, k0D ^ k0F ^ k05 ^ k0A); t = ROL(5, a) + f3(b, c, d) + e + k0D; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0E = ROL(1, k0E ^ k00 ^ k06 ^ k0B); t = ROL(5, a) + f3(b, c, d) + e + k0E; e = d; d = c; c = ROL(30, b); b = a; a = t;
-	k0F = ROL(1, k0F ^ k01 ^ k07 ^ k0C); t = ROL(5, a) + f3(b, c, d) + e + k0F; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f0(b, c, d) + e + k10; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f0(b, c, d) + e + k11; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f0(b, c, d) + e + k12; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f0(b, c, d) + e + k13; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f0(b, c, d) + e + k14; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f0(b, c, d) + e + k15; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f0(b, c, d) + e + k16; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f0(b, c, d) + e + k17; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f0(b, c, d) + e + k18; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f0(b, c, d) + e + k19; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k20; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k21; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k22; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k23; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k24; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k25; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k26; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k27; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k28; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k29; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k30; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k31; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k32; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k33; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k34; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k35; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k36; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k37; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k38; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f1(b, c, d) + e + k39; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k40; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k41; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k42; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k43; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k44; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k45; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k46; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k47; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k48; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k49; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k50; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k51; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k52; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k53; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k54; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k55; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k56; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k57; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k58; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f2(b, c, d) + e + k59; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k60; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k61; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k62; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k63; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k64; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k65; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k66; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k67; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k68; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k69; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k70; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k71; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k72; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k73; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k74; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k75; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k76; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k77; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k78; e = d; d = c; c = ROL(30, b); b = a; a = t;
+	t = ROL(5, a) + f3(b, c, d) + e + k79; e = d; d = c; c = ROL(30, b); b = a; a = t;
 
 	hash[0] = 0x67452301U + a;
 	hash[1] = 0xEFCDAB89U + b;
 	hash[2] = 0x98BADCFEU + c;
 }
 
+void
+sha1_k80_1(T *hash,
+		   T t01,
+		   T k00, T k01, T k02, T k03, T k04, T k05, T k06, T k07, T k08, T k09,
+		   T k10, T k11, T k12, T k13, T k14, T k15, T k16, T k17, T k18, T k19,
+		   T k20, T k21, T k22, T k23, T k24, T k25, T k26, T k27, T k28, T k29,
+		   T k30, T k31, T k32, T k33, T k34, T k35, T k36, T k37, T k38, T k39,
+		   T k40, T k41, T k42, T k43, T k44, T k45, T k46, T k47, T k48, T k49,
+		   T k50, T k51, T k52, T k53, T k54, T k55, T k56, T k57, T k58, T k59,
+		   T k60, T k61, T k62, T k63, T k64, T k65, T k66, T k67, T k68, T k69,
+		   T k70, T k71, T k72, T k73, T k74, T k75, T k76, T k77, T k78, T k79)
+{
+	k01 ^= t01;
+	T t17 = ROL(1, t01); k17 ^= t17;
+
+
+	T t20 = ROL(1, t17); k20 ^= t20;
+
+
+	T t23 = ROL(1, t20); k23 ^= t23;
+
+	T t25 = t20; k25 ^= t25;
+	T t26 = ROL(2, t25); k26 ^= t26;
+
+
+	T t29 = ROL(1, t26); k29 ^= t29;
+
+	T t31 = t26 ^ t25; k31 ^= t31;
+	T t32 = ROL(1, t29); k32 ^= t32;
+	T t33 = t25 ^ t23; k33 ^= t33;
+
+	T t35 = ROL(1, t32); k35 ^= t35;
+	T t36 = t26; k36 ^= t36;
+	T t37 = t36 ^ t32; k37 ^= t37;
+	T t38 = ROL(4, t36); k38 ^= t38;
+	T t39 = t36; k39 ^= t39;
+
+	T t41 = ROL(1, t38 ^ t23); k41 ^= t41;
+
+	T t43 = t38 ^ t32; k43 ^= t43;
+	T t44 = ROL(6, t39); k44 ^= t44;
+	T t45 = t35 ^ t32 ^ t23; k45 ^= t45;
+
+	T t47 = ROL(1, t44 ^ t23); k47 ^= t47;
+	T t48 = t43 ^ t37; k48 ^= t48;
+	T t49 = t48 ^ t44 ^ t29 ^ t23; k49 ^= t49;
+	T t50 = ROL(2, t44); k50 ^= t50;
+	T t51 = t38; k51 ^= t51;
+	T t52 = t37; k52 ^= t52;
+	T t53 = t48 ^ ROL(5, t51); k53 ^= t53;
+
+	T t55 = t50 ^ t44 ^ t35; k55 ^= t55;
+	T t56 = ROL(6, t51); k56 ^= t56;
+	T t57 = t52 ^ ROL(4, t45); k57 ^= t57;
+	T t58 = t51; k58 ^= t58;
+	T t59 = t53 ^ ROL(9, t52); k59 ^= t59;
+	T t60 = t58 ^ t50; k60 ^= t60;
+	T t61 = t41 ^ ROL(4, t49); k61 ^= t61;
+	T t62 = ROL(8, t58); k62 ^= t62;
+	T t63 = t60 ^ t52; k63 ^= t63;
+	T t64 = t58; k64 ^= t64;
+	T t65 = t63 ^ ROL(1, t62 ^ t32); k65 ^= t65;
+
+	T t67 = t62 ^ t56; k67 ^= t67;
+	T t68 = ROL(1, t65 ^ t63); k68 ^= t68;
+	T t69 = ROL(8, t45); k69 ^= t69;
+
+	T t71 = ROL(8, t47); k71 ^= t71;
+	T t72 = t62 ^ t50; k72 ^= t72;
+	T t73 = t29 ^ ROL(8, t49); k73 ^= t73;
+	T t74 = ROL(12, t64); k74 ^= t74;
+	T t75 = t72 ^ t60; k75 ^= t75;
+	T t76 = t72 ^ t67 ^ t32; k76 ^= t76;
+	T t77 = ROL(4, t65 ^ t45); k77 ^= t77;
+
+	T t79 = ROL(4, t67 ^ t47 ^ t23); k79 ^= t79;
+
+	sha1_k80(hash,
+			 k00, k01, k02, k03, k04, k05, k06, k07, k08, k09,
+			 k10, k11, k12, k13, k14, k15, k16, k17, k18, k19,
+			 k20, k21, k22, k23, k24, k25, k26, k27, k28, k29,
+			 k30, k31, k32, k33, k34, k35, k36, k37, k38, k39,
+			 k40, k41, k42, k43, k44, k45, k46, k47, k48, k49,
+			 k50, k51, k52, k53, k54, k55, k56, k57, k58, k59,
+			 k60, k61, k62, k63, k64, k65, k66, k67, k68, k69,
+			 k70, k71, k72, k73, k74, k75, k76, k77, k78, k79);
+}
+
+void
+sha1_32(T *hash,
+		T k00, T k01, T k02, T k03, T k04, T k05, T k06, T k07,
+		T k08, T k09, T k10, T k11, T k12, T k13, T k14, T k15)
+{
+	T k16 = ROL(1, k00 ^ k02 ^ k08 ^ k13);
+	T k17 = ROL(1, k01 ^ k03 ^ k09 ^ k14);
+	T k18 = ROL(1, k02 ^ k04 ^ k10 ^ k15);
+	T k19 = ROL(1, k03 ^ k05 ^ k11 ^ k16);
+	T k20 = ROL(1, k04 ^ k06 ^ k12 ^ k17);
+	T k21 = ROL(1, k05 ^ k07 ^ k13 ^ k18);
+	T k22 = ROL(1, k06 ^ k08 ^ k14 ^ k19);
+	T k23 = ROL(1, k07 ^ k09 ^ k15 ^ k20);
+	T k24 = ROL(1, k08 ^ k10 ^ k16 ^ k21);
+	T k25 = ROL(1, k09 ^ k11 ^ k17 ^ k22);
+	T k26 = ROL(1, k10 ^ k12 ^ k18 ^ k23);
+	T k27 = ROL(1, k11 ^ k13 ^ k19 ^ k24);
+	T k28 = ROL(1, k12 ^ k14 ^ k20 ^ k25);
+	T k29 = ROL(1, k13 ^ k15 ^ k21 ^ k26);
+	T k30 = ROL(1, k14 ^ k16 ^ k22 ^ k27);
+	T k31 = ROL(1, k15 ^ k17 ^ k23 ^ k28);
+	T k32 = ROL(1, k16 ^ k18 ^ k24 ^ k29);
+	T k33 = ROL(1, k17 ^ k19 ^ k25 ^ k30);
+	T k34 = ROL(1, k18 ^ k20 ^ k26 ^ k31);
+	T k35 = ROL(1, k19 ^ k21 ^ k27 ^ k32);
+	T k36 = ROL(1, k20 ^ k22 ^ k28 ^ k33);
+	T k37 = ROL(1, k21 ^ k23 ^ k29 ^ k34);
+	T k38 = ROL(1, k22 ^ k24 ^ k30 ^ k35);
+	T k39 = ROL(1, k23 ^ k25 ^ k31 ^ k36);
+	T k40 = ROL(1, k24 ^ k26 ^ k32 ^ k37);
+	T k41 = ROL(1, k25 ^ k27 ^ k33 ^ k38);
+	T k42 = ROL(1, k26 ^ k28 ^ k34 ^ k39);
+	T k43 = ROL(1, k27 ^ k29 ^ k35 ^ k40);
+	T k44 = ROL(1, k28 ^ k30 ^ k36 ^ k41);
+	T k45 = ROL(1, k29 ^ k31 ^ k37 ^ k42);
+	T k46 = ROL(1, k30 ^ k32 ^ k38 ^ k43);
+	T k47 = ROL(1, k31 ^ k33 ^ k39 ^ k44);
+	T k48 = ROL(1, k32 ^ k34 ^ k40 ^ k45);
+	T k49 = ROL(1, k33 ^ k35 ^ k41 ^ k46);
+	T k50 = ROL(1, k34 ^ k36 ^ k42 ^ k47);
+	T k51 = ROL(1, k35 ^ k37 ^ k43 ^ k48);
+	T k52 = ROL(1, k36 ^ k38 ^ k44 ^ k49);
+	T k53 = ROL(1, k37 ^ k39 ^ k45 ^ k50);
+	T k54 = ROL(1, k38 ^ k40 ^ k46 ^ k51);
+	T k55 = ROL(1, k39 ^ k41 ^ k47 ^ k52);
+	T k56 = ROL(1, k40 ^ k42 ^ k48 ^ k53);
+	T k57 = ROL(1, k41 ^ k43 ^ k49 ^ k54);
+	T k58 = ROL(1, k42 ^ k44 ^ k50 ^ k55);
+	T k59 = ROL(1, k43 ^ k45 ^ k51 ^ k56);
+	T k60 = ROL(1, k44 ^ k46 ^ k52 ^ k57);
+	T k61 = ROL(1, k45 ^ k47 ^ k53 ^ k58);
+	T k62 = ROL(1, k46 ^ k48 ^ k54 ^ k59);
+	T k63 = ROL(1, k47 ^ k49 ^ k55 ^ k60);
+	T k64 = ROL(1, k48 ^ k50 ^ k56 ^ k61);
+	T k65 = ROL(1, k49 ^ k51 ^ k57 ^ k62);
+	T k66 = ROL(1, k50 ^ k52 ^ k58 ^ k63);
+	T k67 = ROL(1, k51 ^ k53 ^ k59 ^ k64);
+	T k68 = ROL(1, k52 ^ k54 ^ k60 ^ k65);
+	T k69 = ROL(1, k53 ^ k55 ^ k61 ^ k66);
+	T k70 = ROL(1, k54 ^ k56 ^ k62 ^ k67);
+	T k71 = ROL(1, k55 ^ k57 ^ k63 ^ k68);
+	T k72 = ROL(1, k56 ^ k58 ^ k64 ^ k69);
+	T k73 = ROL(1, k57 ^ k59 ^ k65 ^ k70);
+	T k74 = ROL(1, k58 ^ k60 ^ k66 ^ k71);
+	T k75 = ROL(1, k59 ^ k61 ^ k67 ^ k72);
+	T k76 = ROL(1, k60 ^ k62 ^ k68 ^ k73);
+	T k77 = ROL(1, k61 ^ k63 ^ k69 ^ k74);
+	T k78 = ROL(1, k62 ^ k64 ^ k70 ^ k75);
+	T k79 = ROL(1, k63 ^ k65 ^ k71 ^ k76);
+	sha1_k80(hash,
+			 k00, k01, k02, k03, k04, k05, k06, k07, k08, k09,
+			 k10, k11, k12, k13, k14, k15, k16, k17, k18, k19,
+			 k20, k21, k22, k23, k24, k25, k26, k27, k28, k29,
+			 k30, k31, k32, k33, k34, k35, k36, k37, k38, k39,
+			 k40, k41, k42, k43, k44, k45, k46, k47, k48, k49,
+			 k50, k51, k52, k53, k54, k55, k56, k57, k58, k59,
+			 k60, k61, k62, k63, k64, k65, k66, k67, k68, k69,
+			 k70, k71, k72, k73, k74, k75, k76, k77, k78, k79);
+}
+
+void
+sha1_32_1(T *hash,
+		T k00, T k01, T k02, T k03, T k04, T k05, T k06, T k07,
+		T k08, T k09, T k10, T k11, T k12, T k13, T k14, T k15)
+{
+	T t01 = k01;
+	t01 = 0;
+	T k16 = ROL(1, k00 ^ k02 ^ k08 ^ k13);
+	T k17 = ROL(1, k01 ^ k03 ^ k09 ^ k14);
+	T k18 = ROL(1, k02 ^ k04 ^ k10 ^ k15);
+	T k19 = ROL(1, k03 ^ k05 ^ k11 ^ k16);
+	T k20 = ROL(1, k04 ^ k06 ^ k12 ^ k17);
+	T k21 = ROL(1, k05 ^ k07 ^ k13 ^ k18);
+	T k22 = ROL(1, k06 ^ k08 ^ k14 ^ k19);
+	T k23 = ROL(1, k07 ^ k09 ^ k15 ^ k20);
+	T k24 = ROL(1, k08 ^ k10 ^ k16 ^ k21);
+	T k25 = ROL(1, k09 ^ k11 ^ k17 ^ k22);
+	T k26 = ROL(1, k10 ^ k12 ^ k18 ^ k23);
+	T k27 = ROL(1, k11 ^ k13 ^ k19 ^ k24);
+	T k28 = ROL(1, k12 ^ k14 ^ k20 ^ k25);
+	T k29 = ROL(1, k13 ^ k15 ^ k21 ^ k26);
+	T k30 = ROL(1, k14 ^ k16 ^ k22 ^ k27);
+	T k31 = ROL(1, k15 ^ k17 ^ k23 ^ k28);
+	T k32 = ROL(1, k16 ^ k18 ^ k24 ^ k29);
+	T k33 = ROL(1, k17 ^ k19 ^ k25 ^ k30);
+	T k34 = ROL(1, k18 ^ k20 ^ k26 ^ k31);
+	T k35 = ROL(1, k19 ^ k21 ^ k27 ^ k32);
+	T k36 = ROL(1, k20 ^ k22 ^ k28 ^ k33);
+	T k37 = ROL(1, k21 ^ k23 ^ k29 ^ k34);
+	T k38 = ROL(1, k22 ^ k24 ^ k30 ^ k35);
+	T k39 = ROL(1, k23 ^ k25 ^ k31 ^ k36);
+	T k40 = ROL(1, k24 ^ k26 ^ k32 ^ k37);
+	T k41 = ROL(1, k25 ^ k27 ^ k33 ^ k38);
+	T k42 = ROL(1, k26 ^ k28 ^ k34 ^ k39);
+	T k43 = ROL(1, k27 ^ k29 ^ k35 ^ k40);
+	T k44 = ROL(1, k28 ^ k30 ^ k36 ^ k41);
+	T k45 = ROL(1, k29 ^ k31 ^ k37 ^ k42);
+	T k46 = ROL(1, k30 ^ k32 ^ k38 ^ k43);
+	T k47 = ROL(1, k31 ^ k33 ^ k39 ^ k44);
+	T k48 = ROL(1, k32 ^ k34 ^ k40 ^ k45);
+	T k49 = ROL(1, k33 ^ k35 ^ k41 ^ k46);
+	T k50 = ROL(1, k34 ^ k36 ^ k42 ^ k47);
+	T k51 = ROL(1, k35 ^ k37 ^ k43 ^ k48);
+	T k52 = ROL(1, k36 ^ k38 ^ k44 ^ k49);
+	T k53 = ROL(1, k37 ^ k39 ^ k45 ^ k50);
+	T k54 = ROL(1, k38 ^ k40 ^ k46 ^ k51);
+	T k55 = ROL(1, k39 ^ k41 ^ k47 ^ k52);
+	T k56 = ROL(1, k40 ^ k42 ^ k48 ^ k53);
+	T k57 = ROL(1, k41 ^ k43 ^ k49 ^ k54);
+	T k58 = ROL(1, k42 ^ k44 ^ k50 ^ k55);
+	T k59 = ROL(1, k43 ^ k45 ^ k51 ^ k56);
+	T k60 = ROL(1, k44 ^ k46 ^ k52 ^ k57);
+	T k61 = ROL(1, k45 ^ k47 ^ k53 ^ k58);
+	T k62 = ROL(1, k46 ^ k48 ^ k54 ^ k59);
+	T k63 = ROL(1, k47 ^ k49 ^ k55 ^ k60);
+	T k64 = ROL(1, k48 ^ k50 ^ k56 ^ k61);
+	T k65 = ROL(1, k49 ^ k51 ^ k57 ^ k62);
+	T k66 = ROL(1, k50 ^ k52 ^ k58 ^ k63);
+	T k67 = ROL(1, k51 ^ k53 ^ k59 ^ k64);
+	T k68 = ROL(1, k52 ^ k54 ^ k60 ^ k65);
+	T k69 = ROL(1, k53 ^ k55 ^ k61 ^ k66);
+	T k70 = ROL(1, k54 ^ k56 ^ k62 ^ k67);
+	T k71 = ROL(1, k55 ^ k57 ^ k63 ^ k68);
+	T k72 = ROL(1, k56 ^ k58 ^ k64 ^ k69);
+	T k73 = ROL(1, k57 ^ k59 ^ k65 ^ k70);
+	T k74 = ROL(1, k58 ^ k60 ^ k66 ^ k71);
+	T k75 = ROL(1, k59 ^ k61 ^ k67 ^ k72);
+	T k76 = ROL(1, k60 ^ k62 ^ k68 ^ k73);
+	T k77 = ROL(1, k61 ^ k63 ^ k69 ^ k74);
+	T k78 = ROL(1, k62 ^ k64 ^ k70 ^ k75);
+	T k79 = ROL(1, k63 ^ k65 ^ k71 ^ k76);
+#if 1
+	sha1_k80_1(hash,
+			   t01,
+			   k00, k01, k02, k03, k04, k05, k06, k07, k08, k09,
+			   k10, k11, k12, k13, k14, k15, k16, k17, k18, k19,
+			   k20, k21, k22, k23, k24, k25, k26, k27, k28, k29,
+			   k30, k31, k32, k33, k34, k35, k36, k37, k38, k39,
+			   k40, k41, k42, k43, k44, k45, k46, k47, k48, k49,
+			   k50, k51, k52, k53, k54, k55, k56, k57, k58, k59,
+			   k60, k61, k62, k63, k64, k65, k66, k67, k68, k69,
+			   k70, k71, k72, k73, k74, k75, k76, k77, k78, k79);
+#else
+	sha1_k80(hash,
+			 k00, k01, k02, k03, k04, k05, k06, k07, k08, k09,
+			 k10, k11, k12, k13, k14, k15, k16, k17, k18, k19,
+			 k20, k21, k22, k23, k24, k25, k26, k27, k28, k29,
+			 k30, k31, k32, k33, k34, k35, k36, k37, k38, k39,
+			 k40, k41, k42, k43, k44, k45, k46, k47, k48, k49,
+			 k50, k51, k52, k53, k54, k55, k56, k57, k58, k59,
+			 k60, k61, k62, k63, k64, k65, k66, k67, k68, k69,
+			 k70, k71, k72, k73, k74, k75, k76, k77, k78, k79);
+#endif
+}
+
 #define SW(a0, a1, j, m) (t = (a0 ^ (a1 << j)) & m, a0 ^= t, a1 ^= (t >> j))
 
-void tr32(const unsigned *in, unsigned *out)
+void tr32(const T *in, T *out)
 {
-	unsigned a00 = in[0x00];
-	unsigned a01 = in[0x01];
-	unsigned a02 = in[0x02];
-	unsigned a03 = in[0x03];
-	unsigned a04 = in[0x04];
-	unsigned a05 = in[0x05];
-	unsigned a06 = in[0x06];
-	unsigned a07 = in[0x07];
-	unsigned a08 = in[0x08];
-	unsigned a09 = in[0x09];
-	unsigned a0A = in[0x0A];
-	unsigned a0B = in[0x0B];
-	unsigned a0C = in[0x0C];
-	unsigned a0D = in[0x0D];
-	unsigned a0E = in[0x0E];
-	unsigned a0F = in[0x0F];
-	unsigned a10 = in[0x10];
-	unsigned a11 = in[0x11];
-	unsigned a12 = in[0x12];
-	unsigned a13 = in[0x13];
-	unsigned a14 = in[0x14];
-	unsigned a15 = in[0x15];
-	unsigned a16 = in[0x16];
-	unsigned a17 = in[0x17];
-	unsigned a18 = in[0x18];
-	unsigned a19 = in[0x19];
-	unsigned a1A = in[0x1A];
-	unsigned a1B = in[0x1B];
-	unsigned a1C = in[0x1C];
-	unsigned a1D = in[0x1D];
-	unsigned a1E = in[0x1E];
-	unsigned a1F = in[0x1F];
-	unsigned t;
-	unsigned m = 0xFFFF0000;
+	T a00 = in[0x00];
+	T a01 = in[0x01];
+	T a02 = in[0x02];
+	T a03 = in[0x03];
+	T a04 = in[0x04];
+	T a05 = in[0x05];
+	T a06 = in[0x06];
+	T a07 = in[0x07];
+	T a08 = in[0x08];
+	T a09 = in[0x09];
+	T a0A = in[0x0A];
+	T a0B = in[0x0B];
+	T a0C = in[0x0C];
+	T a0D = in[0x0D];
+	T a0E = in[0x0E];
+	T a0F = in[0x0F];
+	T a10 = in[0x10];
+	T a11 = in[0x11];
+	T a12 = in[0x12];
+	T a13 = in[0x13];
+	T a14 = in[0x14];
+	T a15 = in[0x15];
+	T a16 = in[0x16];
+	T a17 = in[0x17];
+	T a18 = in[0x18];
+	T a19 = in[0x19];
+	T a1A = in[0x1A];
+	T a1B = in[0x1B];
+	T a1C = in[0x1C];
+	T a1D = in[0x1D];
+	T a1E = in[0x1E];
+	T a1F = in[0x1F];
+	T t;
+	T m = 0xFFFF0000;
 	SW(a00, a10, 16, m);
 	SW(a01, a11, 16, m);
 	SW(a02, a12, 16, m);
@@ -330,7 +619,7 @@ void tr32(const unsigned *in, unsigned *out)
 	out[0x1F] = a1F;
 }
 
-unsigned b64e(unsigned a) {
+T b64e(unsigned a) {
 	if ('.' <= a && a <= '/')
 		a -= '.' - 076;
 	else if ('0' <= a && a <= '9')
@@ -344,24 +633,25 @@ unsigned b64e(unsigned a) {
 	return a;
 }
 
-unsigned cmp8(unsigned a, unsigned b,
+T cmp8(T a, T b,
 		 int s0, int s1, int s2, int s3,
 		 int s4, int s5, int s6, int s7)
 {
-	unsigned s04 = ((b64e(s0) << 26)
+	T s04 = ((b64e(s0) << 26)
 					| (b64e(s1) << 20)
 					| (b64e(s2) << 14)
 					| (b64e(s3) << 8)
 					| (b64e(s4) << 2)
 					| (b64e(s5) >> 4));
-	unsigned s47 = ((b64e(s5) << 28)
+	T s47 = ((b64e(s5) << 28)
 					| (b64e(s6) << 22)
 					| (b64e(s7) << 16));
 	return (a == s04
-			&& (b & 0xFFFF0000) == s47);
+			&& (b & 0xFFFF0000) == s47
+		);
 }
 
-unsigned cmps(unsigned a, unsigned b)
+T cmps(T a, T b)
 {
 	return (0
 #if 0
@@ -400,58 +690,103 @@ unsigned cmps(unsigned a, unsigned b)
 		);
 }
 
-#define W4 0
-
 #ifdef __OPENCL_VERSION__
-
-#if W4
-#define W uint4
-#else
-#define W unsigned
-#endif
-
 #if 1
 __kernel
 void gpuMain(__global W *Ary,
-			 unsigned k0,
-			 unsigned k2)
+			 __constant T k[80])
 {
 	unsigned i;
 	unsigned id = get_global_id(0);
 	W a[32], b[32];
 	W t[32];
 
-	unsigned h[5];
+	T h[5];
+	W m = 0;
+	for (i = 0; i < 32; i++) {
+		sha1_k80_1(h,
+				   key32((id << 5) + i),
+				   k[00], 0, k[02], 0x80000000,
+				   0x00000000, 0x00000000, 0x00000000, 0x00000000,
+				   0x00000000, 0x00000000, 0x00000000, 0x00000000,
+				   0x00000000, 0x00000000, 0x00000000, 0x00000060,
+				   k[16], k[17], k[18], k[19],
+				   k[20], k[21], k[22], k[23], k[24], k[25], k[26], k[27], k[28], k[29],
+				   k[30], k[31], k[32], k[33], k[34], k[35], k[36], k[37], k[38], k[39],
+				   k[40], k[41], k[42], k[43], k[44], k[45], k[46], k[47], k[48], k[49],
+				   k[50], k[51], k[52], k[53], k[54], k[55], k[56], k[57], k[58], k[59],
+				   k[60], k[61], k[62], k[63], k[64], k[65], k[66], k[67], k[68], k[69],
+				   k[70], k[71], k[72], k[73], k[74], k[75], k[76], k[77], k[78], k[79]);
+#if 1
+		m >>= 1;
+		if (cmps(h[0], h[1]))
+			m |= 0x80000000;
+#else
+		a[i] = h[0];
+		b[i] = h[1];
+#endif
+	}
+
+	W x;
+#if 1
+	x = 0;
+	for (i = 0; i < 32; i++) {
+		if (0
+			)
+			x ^= 1U << i;
+	}
+#else
+	tr32(a, t);
+	x = t[31];
+	for (i = 1; i < 30; i++)
+		x |= t[31 - i];
+	x = ~x;
+#endif
+
+	Ary[id] = m;
+}
+#elif 1
+__kernel
+void gpuMain(__global W *Ary,
+			 T k0,
+			 T k2)
+{
+	unsigned i;
+	unsigned id = get_global_id(0);
+	W a[32], b[32];
+	W t[32];
+
+	T h[5];
 	W m = 0;
 	for (i = 0; i < 32; i++) {
 #if W4
 		sha1_32(h,
-				k0, k1, k32((id << 7) + i + 0), 0x80000000,
+				k0, k1, key32((id << 7) + i + 0), 0x80000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000060);
 		a[i].x = h[0];
 		sha1_32(h,
-				k0, k1, k32((id << 7) + i + 1), 0x80000000,
+				k0, k1, key32((id << 7) + i + 1), 0x80000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000060);
 		a[i].y = h[0];
 		sha1_32(h,
-				k0, k1, k32((id << 7) + i + 2), 0x80000000,
+				k0, k1, key32((id << 7) + i + 2), 0x80000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000060);
 		a[i].z = h[0];
 		sha1_32(h,
-				k0, k1, k32((id << 7) + i + 3), 0x80000000,
+				k0, k1, key32((id << 7) + i + 3), 0x80000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000060);
 		a[i].w = h[0];
 #else
-		sha1_32(h,
-				k0, k32((id << 5) + i), k2, 0x80000000,
+		sha1_32_1(h,
+				k0, key32((id << 5) + i), k2, 0x80000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000000,
 				0x00000000, 0x00000000, 0x00000000, 0x00000060);
@@ -492,29 +827,29 @@ void gpuMain(__global uint4 *Ary)
 	unsigned id = get_global_id(0);
 	uint4 a[32];
 
-	unsigned h[5];
+	T h[5];
 	for (i = 0; i < 32; i++) {
 #if 1
 	sha1_32(h,
-		0x55555555, 0x55555555, k32((id << 7) + i + 0), 0x80000000,
+		0x55555555, 0x55555555, key32((id << 7) + i + 0), 0x80000000,
 		0x00000000, 0x00000000, 0x00000000, 0x00000000,
 		0x00000000, 0x00000000, 0x00000000, 0x00000000,
 		0x00000000, 0x00000000, 0x00000000, 0x00000060);
 	a[i].x = h[0];
 	sha1_32(h,
-		0x55555555, 0x55555555, k32((id << 7) + i + 1), 0x80000000,
+		0x55555555, 0x55555555, key32((id << 7) + i + 1), 0x80000000,
 		0x00000000, 0x00000000, 0x00000000, 0x00000000,
 		0x00000000, 0x00000000, 0x00000000, 0x00000000,
 		0x00000000, 0x00000000, 0x00000000, 0x00000060);
 	a[i].y = h[0];
 	sha1_32(h,
-		0x55555555, 0x55555555, k32((id << 7) + i + 2), 0x80000000,
+		0x55555555, 0x55555555, key32((id << 7) + i + 2), 0x80000000,
 		0x00000000, 0x00000000, 0x00000000, 0x00000000,
 		0x00000000, 0x00000000, 0x00000000, 0x00000000,
 		0x00000000, 0x00000000, 0x00000000, 0x00000060);
 	a[i].z = h[0];
 	sha1_32(h,
-		0x55555555, 0x55555555, k32((id << 7) + i + 3), 0x80000000,
+		0x55555555, 0x55555555, key32((id << 7) + i + 3), 0x80000000,
 		0x00000000, 0x00000000, 0x00000000, 0x00000000,
 		0x00000000, 0x00000000, 0x00000000, 0x00000000,
 		0x00000000, 0x00000000, 0x00000000, 0x00000060);
@@ -536,13 +871,6 @@ void gpuMain(__global uint4 *Ary)
 	Ary[id] = x;
 }
 #endif
-#else
-#if W4
-#define W cl_uint4
-#else
-#define W cl_uint
-#endif
-
 #endif
 
 /*
