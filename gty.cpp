@@ -39,17 +39,214 @@ void print_key_hash(FILE *fp, const uint32_t *h)
 
 static cl_uint numDevices;
 static cl_device_id devs[64];
-static cl_context ctx[64];
-static cl_command_queue queue[64];
-static cl_kernel kernel[64];
-#if 0
-static const char *const kernel_src[] = {
-	"__kernel void gpuMain(__global unsigned *Ary) {",
-	"unsigned id = get_global_id(0);",
-	"Ary[id] = id;",
-	"}",
+
+struct pdarg
+{
+	cl_device_id dev;
 };
+
+void per_device(void* arg)
+{
+	cl_int status;
+	cl_context ctx;
+	cl_command_queue queue;
+	pdarg* pd = (pdarg*)arg;
+	ctx = clCreateContext(NULL, 1, &pd->dev, 0, 0, &status);
+	printf("XX%p\n", pd);
+	printf("create=%d\n", status);
+	queue = clCreateCommandQueue(ctx, pd->dev, 0, &status);
+	printf("queue=%d\n", status);
+
+	/* source */
+	char srcbuf[262144];
+	FILE *sfp = fopen("gty.cl", "r");
+	size_t srcsiz = fread(srcbuf, 1, sizeof(srcbuf), sfp);
+	fclose(sfp);
+	srcbuf[srcsiz] = 0;
+	static char *srcp[] = {srcbuf};
+	cl_program program
+		= clCreateProgramWithSource(ctx,
+									sizeof(srcp) / sizeof(*srcp),
+									(const char **)srcp,
+									NULL,
+									&status);
+	printf("createProgram(%d)=%d\n",
+		   sizeof(srcp) / sizeof(*srcp),
+		   status);
+	status = clBuildProgram(program,
+							0, NULL,
+							"-O3 -fbin-source -fbin-llvmir -fbin-amdil -fbin-exe",
+							NULL,
+							NULL);
+	printf("build=%d\n", status);
+	size_t szsz;
+	size_t szs[256];
+	status = clGetProgramInfo(program,
+							  CL_PROGRAM_BINARY_SIZES,
+							  sizeof(szs),
+							  (void *)szs,
+							  &szsz);
+	unsigned char bbuf[1048576];
+	unsigned char *pbuf[] = {bbuf};
+	printf("ssz=%d->%d p=%p st=%d\n", szsz, szs[0], pbuf[0], status);
+	size_t bsz;
+	status = clGetProgramInfo(program,
+							  CL_PROGRAM_BINARIES,
+							  sizeof(pbuf),
+							  (void *)pbuf,
+							  &bsz);
+	printf("bsz=%d p=%p st=%d\n", bsz, pbuf[0], status);
+#if 1
+	FILE *fp = fopen("gty.elf", "wb");
+	fwrite(bbuf, 1, szs[0], fp);
+	fclose(fp);
+#else
+	for (int j = 0; j < szs[0]; j += 16) {
+		for (int k = 0; k < 16; k++)
+			printf("%02X ", bbuf[j + k]);
+		for (int k = 0; k < 16; k++) {
+			int c = bbuf[j + k];
+			printf("%c", (0x20 <= c && c <= 0x7E
+						  ? c : '.'));
+		}
+		printf(":%04X\n", j);
+	}
+	printf("(%d)\n", szs[0]);
 #endif
+	cl_kernel kernel = clCreateKernel(program, "gpuMain", &status);
+	printf("createkernel=%d\n", status);
+#define N (128 * 128 * 128)
+	W *data;
+	cl_mem ary = clCreateBuffer(ctx,
+								CL_MEM_ALLOC_HOST_PTR,
+								N * sizeof(W), NULL, NULL);
+	clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&ary);
+#if 1
+	cl_mem kkey = clCreateBuffer(ctx,
+								 CL_MEM_ALLOC_HOST_PTR,
+								 80 * sizeof(W), NULL, NULL);
+	clSetKernelArg(kernel, 1, sizeof(cl_mem), (void*)&kkey);
+#else
+	unsigned k0;
+	unsigned k1;
+	unsigned k2;
+#endif
+
+#if 1
+	W *keys;
+	keys = (W*)clEnqueueMapBuffer(queue, kkey, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, 80 * sizeof(*keys), 0, NULL, NULL, NULL);
+	assert(keys);
+	for (int j = 0; j < 80; j++) keys[j] = 0;
+	keys[ 3] = 0x80000000;
+	keys[15] = 0x00000060;
+	clEnqueueUnmapMemObject(queue, kkey, (void*)keys, 0, NULL, NULL);
+#else
+	unsigned keys[80];
+	for (int j = 0; j < 80; j++) keys[j] = 0;
+	keys[ 3] = 0x80000000;
+	keys[15] = 0x00000060;
+#endif
+	struct timeval t1, t2;
+	gettimeofday(&t1, NULL);
+	static size_t worksize[] = {N};
+	int iter;
+	WaitForSingleObject(gmutex, INFINITE);
+	srand(time(NULL));
+	ReleaseMutex(gmutex);
+
+	while (1) {
+		keys = (W*)clEnqueueMapBuffer(queue, kkey, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, 80 * sizeof(*keys), 0, NULL, NULL, NULL);
+		assert(keys);
+		keys[0] = key32(rand() ^ (rand() << 8) ^ (rand() << 16));
+		keys[2] = k32L(rand() ^ (rand() << 8) ^ (rand() << 16));
+		for (int j = 16; j < 80; j++)
+			keys[j] = ROL(1, keys[j - 16] ^ keys[j - 14] ^ keys[j - 8] ^ keys[j - 3]);
+		clEnqueueUnmapMemObject(queue, kkey, (void*)keys, 0, NULL, NULL);
+#if 0
+		clSetKernelArg(kernel, 1, sizeof(k0), (void*)&k0);
+		clSetKernelArg(kernel, 2, sizeof(k2), (void*)&k2);
+#endif
+		clEnqueueNDRangeKernel(queue, kernel, 1, NULL, worksize, NULL, 0, NULL, NULL);
+		data = (W*)clEnqueueMapBuffer(queue, ary, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, N * sizeof(*data), 0, NULL, NULL, NULL);
+		loop_gpu[0] += (W4 ? 4 : 1) * 32 * N;
+		for (int j = 0; j < N; j++) {
+			unsigned a = data[j];
+			if (!a) continue;
+			for (int k = 0; k < 32; k++) {
+				if (!(a & (1U << k))) continue;
+				unsigned k0 = keys[0];
+				unsigned k1 = key32((j << 5 + 2 * W4) + k);
+				unsigned k2 = keys[2];
+				unsigned h[5];
+				sha1_32(h,
+						k0, k1, k2, 0x80000000,
+						0x00000000, 0x00000000, 0x00000000, 0x00000000,
+						0x00000000, 0x00000000, 0x00000000, 0x00000000,
+						0x00000000, 0x00000000, 0x00000000, 0x00000060);
+				WaitForSingleObject(gmutex, INFINITE);
+				if (f_wipe) {
+					fprintf(stderr, "                                                                               \r");
+					f_wipe = 0;
+				}
+				print_key_hash(stderr, h);
+				fprintf(stderr, " #%c%c%c%c%c%c%c%c%c%c%c%c\n",
+						(k0 >> 24) & 0xFF,
+						(k0 >> 16) & 0xFF,
+						(k0 >>  8) & 0xFF,
+						(k0 >>  0) & 0xFF,
+						(k1 >> 24) & 0xFF,
+						(k1 >> 16) & 0xFF,
+						(k1 >>  8) & 0xFF,
+						(k1 >>  0) & 0xFF,
+						(k2 >> 24) & 0xFF,
+						(k2 >> 16) & 0xFF,
+						(k2 >>  8) & 0xFF,
+						(k2 >>  0) & 0xFF);
+				ReleaseMutex(gmutex);
+			}
+		}
+		clEnqueueUnmapMemObject(queue, ary, (void*)data, 0, NULL, NULL);
+	}
+	gettimeofday(&t2, NULL);
+	double d1 = 1000000.0 * t1.tv_sec + t1.tv_usec;
+	double d2 = 1000000.0 * t2.tv_sec + t2.tv_usec;
+	printf("%gM/s (%g s)\n",
+		   iter * (W4 ? 4 : 1) * 32 * N / (d2 - d1),
+		   (d2 - d1) / 1000000.0);
+#if 0
+	for (int j = 0; j < N; j++) {
+		unsigned x = 0;
+		for (int k = 0; k < 32; k++) {
+			static uint32_t h[5];
+#if 1
+			sha1_32(h,
+					k0, k1, key32((j << (5 + 2 * W4)) + k), 0x80000000,
+					0x00000000, 0x00000000, 0x00000000, 0x00000000,
+					0x00000000, 0x00000000, 0x00000000, 0x00000000,
+					0x00000000, 0x00000000, 0x00000000, 0x00000060);
+#else
+			sha1_32(h,
+					0x55555555, 0x55555555, 0x55555555, 0x55555555,
+					0x55555555, 0x55555555, 0x55555555, 0x55555555,
+					0x55555555, 0x55555555, 0x55555555, 0x55555555,
+					0x55555555, k24(32 * j + k), 0x00000000, 0x000001B8);
+#endif
+			x ^= h[0];
+		}
+#if W4
+		if (data[j].x != x)
+			printf("%5d: %08X (should be %08X)\n", j, data[j].x, x);
+#else
+		if (data[j] != x)
+			printf("%5d: %08X (should be %08X)\n", j, data[j], x);
+#endif
+	}
+	printf("%gM/s (%g s)\n",
+		   iter * (W4 ? 4 : 1) * 32 * N / (d2 - d1),
+		   (d2 - d1) / 1000000.0);
+#endif
+}
+
 void gpu(void *arg)
 {
 	int i;
@@ -86,199 +283,10 @@ void gpu(void *arg)
 			devs[i] = 0;
 			continue;
 		}
-		ctx[i] = clCreateContext(NULL, 1, &devs[i], 0, 0, &status);
-		printf("create=%d\n", status);
-		queue[i] = clCreateCommandQueue(ctx[i], devs[i], 0, &status);
-		printf("queue=%d\n", status);
-
-		/* source */
-		static char srcbuf[262144];
-		FILE *sfp = fopen("gty.cl", "r");
-		size_t srcsiz = fread(srcbuf, 1, sizeof(srcbuf), sfp);
-		fclose(sfp);
-		srcbuf[srcsiz] = 0;
-		static char *srcp[] = {srcbuf};
-		cl_program program
-			= clCreateProgramWithSource(ctx[i],
-										sizeof(srcp) / sizeof(*srcp),
-										(const char **)srcp,
-										NULL,
-										&status);
-		printf("createProgram(%d)=%d\n",
-			   sizeof(srcp) / sizeof(*srcp),
-			   status);
-		status = clBuildProgram(program,
-								0, NULL,
-								"-O3 -fbin-source -fbin-llvmir -fbin-amdil -fbin-exe",
-								NULL,
-								NULL);
-		printf("build=%d\n", status);
-		size_t szsz;
-		size_t szs[256];
-		status = clGetProgramInfo(program,
-								  CL_PROGRAM_BINARY_SIZES,
-								  sizeof(szs),
-								  (void *)szs,
-								  &szsz);
-		unsigned char bbuf[1048576];
-		unsigned char *pbuf[] = {bbuf};
-		printf("ssz=%d->%d p=%p st=%d\n", szsz, szs[0], pbuf[0], status);
-		size_t bsz;
-		status = clGetProgramInfo(program,
-								  CL_PROGRAM_BINARIES,
-								  sizeof(pbuf),
-								  (void *)pbuf,
-								  &bsz);
-		printf("bsz=%d p=%p st=%d\n", bsz, pbuf[0], status);
-#if 1
-		FILE *fp = fopen("gty.elf", "wb");
-		fwrite(bbuf, 1, szs[0], fp);
-		fclose(fp);
-#else
-		for (int j = 0; j < szs[0]; j += 16) {
-			for (int k = 0; k < 16; k++)
-				printf("%02X ", bbuf[j + k]);
-			for (int k = 0; k < 16; k++) {
-				int c = bbuf[j + k];
-				printf("%c", (0x20 <= c && c <= 0x7E
-							  ? c : '.'));
-			}
-			printf(":%04X\n", j);
-		}
-		printf("(%d)\n", szs[0]);
-#endif
-		kernel[i] = clCreateKernel(program, "gpuMain", &status);
-		printf("createkernel=%d\n", status);
-#define N (128 * 128 * 128)
-		W *data;
-		cl_mem ary = clCreateBuffer(ctx[i],
-									CL_MEM_ALLOC_HOST_PTR,
-									N * sizeof(W), NULL, NULL);
-		clSetKernelArg(kernel[i], 0, sizeof(cl_mem), (void*)&ary);
-#if 1
-		cl_mem kkey = clCreateBuffer(ctx[i],
-									 CL_MEM_ALLOC_HOST_PTR,
-									 80 * sizeof(W), NULL, NULL);
-		clSetKernelArg(kernel[i], 1, sizeof(cl_mem), (void*)&kkey);
-#else
-		unsigned k0;
-		unsigned k1;
-		unsigned k2;
-#endif
-
-#if 1
-		W *keys;
-		keys = (W*)clEnqueueMapBuffer(queue[i], kkey, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, 80 * sizeof(*keys), 0, NULL, NULL, NULL);
-		assert(keys);
-		for (int j = 0; j < 80; j++) keys[j] = 0;
-		keys[ 3] = 0x80000000;
-		keys[15] = 0x00000060;
-		clEnqueueUnmapMemObject(queue[i], kkey, (void*)keys, 0, NULL, NULL);
-#else
-		unsigned keys[80];
-		for (int j = 0; j < 80; j++) keys[j] = 0;
-		keys[ 3] = 0x80000000;
-		keys[15] = 0x00000060;
-#endif
-		struct timeval t1, t2;
-		gettimeofday(&t1, NULL);
-		static size_t worksize[] = {N};
-		int iter;
-		WaitForSingleObject(gmutex, INFINITE);
-		srand(time(NULL));
-		ReleaseMutex(gmutex);
-
-		while (1) {
-			keys = (W*)clEnqueueMapBuffer(queue[i], kkey, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, 80 * sizeof(*keys), 0, NULL, NULL, NULL);
-			assert(keys);
-			keys[0] = key32(rand() ^ (rand() << 8) ^ (rand() << 16));
-			keys[2] = k32L(rand() ^ (rand() << 8) ^ (rand() << 16));
-			for (int j = 16; j < 80; j++)
-			  keys[j] = ROL(1, keys[j - 16] ^ keys[j - 14] ^ keys[j - 8] ^ keys[j - 3]);
-			clEnqueueUnmapMemObject(queue[i], kkey, (void*)keys, 0, NULL, NULL);
-#if 0
-			clSetKernelArg(kernel[i], 1, sizeof(k0), (void*)&k0);
-			clSetKernelArg(kernel[i], 2, sizeof(k2), (void*)&k2);
-#endif
-			clEnqueueNDRangeKernel(queue[i], kernel[i], 1, NULL, worksize, NULL, 0, NULL, NULL);
-			data = (W*)clEnqueueMapBuffer(queue[i], ary, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, N * sizeof(*data), 0, NULL, NULL, NULL);
-			loop_gpu[0] += (W4 ? 4 : 1) * 32 * N;
-			for (int j = 0; j < N; j++) {
-				unsigned a = data[j];
-				if (!a) continue;
-				for (int k = 0; k < 32; k++) {
-					if (!(a & (1U << k))) continue;
-					unsigned k0 = keys[0];
-					unsigned k1 = key32((j << 5 + 2 * W4) + k);
-					unsigned k2 = keys[2];
-					unsigned h[5];
-					sha1_32(h,
-							k0, k1, k2, 0x80000000,
-							0x00000000, 0x00000000, 0x00000000, 0x00000000,
-							0x00000000, 0x00000000, 0x00000000, 0x00000000,
-							0x00000000, 0x00000000, 0x00000000, 0x00000060);
-					WaitForSingleObject(gmutex, INFINITE);
-					if (f_wipe) {
-						fprintf(stderr, "                                                                               \r");
-						f_wipe = 0;
-					}
-					print_key_hash(stderr, h);
-					fprintf(stderr, " #%c%c%c%c%c%c%c%c%c%c%c%c\n",
-						   (k0 >> 24) & 0xFF,
-						   (k0 >> 16) & 0xFF,
-						   (k0 >>  8) & 0xFF,
-						   (k0 >>  0) & 0xFF,
-						   (k1 >> 24) & 0xFF,
-						   (k1 >> 16) & 0xFF,
-						   (k1 >>  8) & 0xFF,
-						   (k1 >>  0) & 0xFF,
-						   (k2 >> 24) & 0xFF,
-						   (k2 >> 16) & 0xFF,
-						   (k2 >>  8) & 0xFF,
-						   (k2 >>  0) & 0xFF);
-					ReleaseMutex(gmutex);
-				}
-			}
-			clEnqueueUnmapMemObject(queue[i], ary, (void*)data, 0, NULL, NULL);
-		}
-		gettimeofday(&t2, NULL);
-		double d1 = 1000000.0 * t1.tv_sec + t1.tv_usec;
-		double d2 = 1000000.0 * t2.tv_sec + t2.tv_usec;
-		printf("%gM/s (%g s)\n",
-			   iter * (W4 ? 4 : 1) * 32 * N / (d2 - d1),
-			   (d2 - d1) / 1000000.0);
-#if 0
-		for (int j = 0; j < N; j++) {
-			unsigned x = 0;
-			for (int k = 0; k < 32; k++) {
-				static uint32_t h[5];
-#if 1
-				sha1_32(h,
-						k0, k1, key32((j << (5 + 2 * W4)) + k), 0x80000000,
-						0x00000000, 0x00000000, 0x00000000, 0x00000000,
-						0x00000000, 0x00000000, 0x00000000, 0x00000000,
-						0x00000000, 0x00000000, 0x00000000, 0x00000060);
-#else
-				sha1_32(h,
-						0x55555555, 0x55555555, 0x55555555, 0x55555555,
-						0x55555555, 0x55555555, 0x55555555, 0x55555555,
-						0x55555555, 0x55555555, 0x55555555, 0x55555555,
-						0x55555555, k24(32 * j + k), 0x00000000, 0x000001B8);
-#endif
-				x ^= h[0];
-			}
-#if W4
-			if (data[j].x != x)
-				printf("%5d: %08X (should be %08X)\n", j, data[j].x, x);
-#else
-			if (data[j] != x)
-				printf("%5d: %08X (should be %08X)\n", j, data[j], x);
-#endif
-		}
-		printf("%gM/s (%g s)\n",
-			   iter * (W4 ? 4 : 1) * 32 * N / (d2 - d1),
-			   (d2 - d1) / 1000000.0);
-#endif
+		pdarg *pd = new pdarg;
+		pd->dev = devs[i];
+		printf("XX%p\n", pd);
+		per_device((void*)pd);
 	}
 }
 
