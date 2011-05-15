@@ -52,7 +52,6 @@ void per_device(void* arg)
 	cl_command_queue queue;
 	pdarg* pd = (pdarg*)arg;
 	ctx = clCreateContext(NULL, 1, &pd->dev, 0, 0, &status);
-	printf("XX%p\n", pd);
 	printf("create=%d\n", status);
 	queue = clCreateCommandQueue(ctx, pd->dev, 0, &status);
 	printf("queue=%d\n", status);
@@ -285,8 +284,11 @@ void gpu(void *arg)
 		}
 		pdarg *pd = new pdarg;
 		pd->dev = devs[i];
-		printf("XX%p\n", pd);
+#if 1
+		_beginthread(per_device, 524288, (void*)pd);
+#else
 		per_device((void*)pd);
+#endif
 	}
 }
 
@@ -318,7 +320,11 @@ int main()
 	gmutex = CreateMutex(NULL, FALSE, NULL);
 	WaitForSingleObject(gmutex, INFINITE);
 
+#if 1
+	gpu(NULL);
+#else
 	_beginthread(gpu, 262144, NULL);
+#endif
 
 	struct timeval tv;
 	memset( &status, 0, sizeof( struct status ) );
