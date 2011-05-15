@@ -1,11 +1,12 @@
 A="/c/Program Files/AMD APP"
+B="/c/Program Files (x86)/AMD APP"
 LLVMBIN=/c/cygwin/home/nakamura/llvm/build/mingw-static/Release+Asserts/bin
 CC=$(LLVMBIN)/clang
 CXX=$(LLVMBIN)/clang++
-I=-isystem $A
+I=-isystem $A -isystem $B
 CFLAGS=-O3 -Wall $I/include
 CXXFLAGS=$(CFLAGS)
-LDFLAGS=-L $A/lib/x86
+LDFLAGS=-L $A/lib/x86 -L $B/lib/x86
 LDLIBS=-lOpenCL
 
 .PRECIOUS: %.c %.bc %.ll %.s %.link.ll %.lopt.ll
