@@ -12,7 +12,7 @@ LDLIBS=-lOpenCL
 .PRECIOUS: %.c %.bc %.ll %.s %.link.ll %.lopt.ll
 
 %.exe: %.s
-	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 %.bc: %.c
 	$(CC) -MMD $(CFLAGS) $< -o $@ -emit-llvm
