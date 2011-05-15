@@ -150,7 +150,7 @@ void per_device(void* arg)
 	static size_t worksize[] = {N};
 	int iter;
 	WaitForSingleObject(gmutex, INFINITE);
-	srand(time(NULL));
+	srand(time(NULL) ^ GetCurrentProcessId() ^ GetCurrentThreadId());
 	ReleaseMutex(gmutex);
 
 	while (1) {
