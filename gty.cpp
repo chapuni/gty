@@ -8,6 +8,9 @@
 #include <sys/time.h>
 #include <inttypes.h>
 
+#include "MT19937.cpp"
+#undef N
+
 #include "gty.cl"
 
 static HANDLE gmutex;
@@ -150,14 +153,20 @@ void per_device(void* arg)
 	static size_t worksize[] = {N};
 	int iter;
 	WaitForSingleObject(gmutex, INFINITE);
-	srand(time(NULL) ^ GetCurrentProcessId() ^ GetCurrentThreadId());
+	MT19937 mt;
+	unsigned long iv[4];
+	iv[0] = t1.tv_sec;
+	iv[1] = t1.tv_usec;
+	iv[2] = GetCurrentProcessId();
+	iv[3] = GetCurrentThreadId();
+	mt.init_by_array(iv, 4);
 	ReleaseMutex(gmutex);
 
 	while (1) {
 		keys = (W*)clEnqueueMapBuffer(queue, kkey, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, 80 * sizeof(*keys), 0, NULL, NULL, NULL);
 		assert(keys);
-		keys[0] = key32(rand() ^ (rand() << 8) ^ (rand() << 16));
-		keys[2] = k32L(rand() ^ (rand() << 8) ^ (rand() << 16));
+		keys[0] = key32(mt.genrand_int32());
+		keys[2] = k32L(mt.genrand_int32());
 		for (int j = 16; j < 80; j++)
 			keys[j] = ROL(1, keys[j - 16] ^ keys[j - 14] ^ keys[j - 8] ^ keys[j - 3]);
 		clEnqueueUnmapMemObject(queue, kkey, (void*)keys, 0, NULL, NULL);
