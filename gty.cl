@@ -16,6 +16,8 @@ typedef unsigned W;
 
 #else
 
+#define __constant const
+
 typedef cl_uint T;
 
 #if W4
@@ -633,38 +635,34 @@ T b64e(unsigned a) {
 	return a;
 }
 
-T cmp8(T a, T b,
-		 int s0, int s1, int s2, int s3,
-		 int s4, int s5, int s6, int s7)
+T cmp8(T a, T b, __constant char s[])
 {
-	T s04 = ((b64e(s0) << 26)
-					| (b64e(s1) << 20)
-					| (b64e(s2) << 14)
-					| (b64e(s3) << 8)
-					| (b64e(s4) << 2)
-					| (b64e(s5) >> 4));
-	T s47 = ((b64e(s5) << 28)
-					| (b64e(s6) << 22)
-					| (b64e(s7) << 16));
+	T s04 = ((b64e(s[0]) << 26)
+					| (b64e(s[1]) << 20)
+					| (b64e(s[2]) << 14)
+					| (b64e(s[3]) << 8)
+					| (b64e(s[4]) << 2)
+					| (b64e(s[5]) >> 4));
+	T s47 = ((b64e(s[5]) << 28)
+					| (b64e(s[6]) << 22)
+					| (b64e(s[7]) << 16));
 	return (a == s04
 			&& (b & 0xFFFF0000) == s47
 		);
 }
 
-T cmp8E(T a, T b, T c,
-		int s0, int s1, int s2, int s3,
-		int s4, int s5, int s6, int s7)
+T cmp8E(T a, T b, T c, __constant char s[])
 {
-	T s01 = ((b64e(s0) << 2)
-			 | (b64e(s1) >> 4));
-	T s16 = ((b64e(s1) << 28)
-			 | (b64e(s2) << 22)
-			 | (b64e(s3) << 16)
-			 | (b64e(s4) << 10)
-			 | (b64e(s5) << 4)
-			 | (b64e(s6) >> 2));
-	T s67 = ((b64e(s6) << 30)
-			 | (b64e(s7) << 24));
+	T s01 = ((b64e(s[0]) << 2)
+			 | (b64e(s[1]) >> 4));
+	T s16 = ((b64e(s[1]) << 28)
+			 | (b64e(s[2]) << 22)
+			 | (b64e(s[3]) << 16)
+			 | (b64e(s[4]) << 10)
+			 | (b64e(s[5]) << 4)
+			 | (b64e(s[6]) >> 2));
+	T s67 = ((b64e(s[6]) << 30)
+			 | (b64e(s[7]) << 24));
 	return (1
 			&& (a & 0x000000FF) == s01
 			&& b == s16
@@ -672,18 +670,16 @@ T cmp8E(T a, T b, T c,
 		);
 }
 
-T cmp7(T a, T b,
-		 int s0, int s1, int s2, int s3,
-		 int s4, int s5, int s6)
+T cmp7(T a, T b, __constant char s[])
 {
-	T s04 = ((b64e(s0) << 26)
-					| (b64e(s1) << 20)
-					| (b64e(s2) << 14)
-					| (b64e(s3) << 8)
-					| (b64e(s4) << 2)
-					| (b64e(s5) >> 4));
-	T s46 = ((b64e(s5) << 28)
-			 | (b64e(s6) << 22));
+	T s04 = ((b64e(s[0]) << 26)
+					| (b64e(s[1]) << 20)
+					| (b64e(s[2]) << 14)
+					| (b64e(s[3]) << 8)
+					| (b64e(s[4]) << 2)
+					| (b64e(s[5]) >> 4));
+	T s46 = ((b64e(s[5]) << 28)
+			 | (b64e(s[6]) << 22));
 	return (a == s04
 			&& (b & 0xFFC00000) == s46
 		);
@@ -692,13 +688,11 @@ T cmp7(T a, T b,
 T cmps(T a, T b, T c)
 {
 	return (0
-			|| cmp8E(a, b, c, '1','1','2','2','1','1','2','2')
-			|| cmp8(a, b, 'L','I','F','E','i','s','/','/')
-			|| cmp8(a, b, 'd','d','z','a','5','i','g','k')
-			|| cmp8(a, b, 'F','R','Z','X','X','X','X','X')
-#if 1
-			|| cmp8(a, b, '6','9','6','9','6','9','6','9')
-#endif
+			|| cmp8E(a, b, c, "Fkok1125")
+			|| cmp8E(a, b, c, "11221122")
+			|| cmp8(a, b, "/YUI.Y//")
+			|| cmp8(a, b, "/./././.")
+			|| cmp8(a, b, "/./././.")
 			);
 }
 
