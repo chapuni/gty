@@ -635,6 +635,54 @@ T b64e(unsigned a) {
 	return a;
 }
 
+T b64b(unsigned a, const T *p)
+{
+	T m;
+	a = b64e(a);
+	m  = (a & 32) ? p[0] : ~p[0];
+	m &= (a & 16) ? p[1] : ~p[1];
+	m &= (a &  8) ? p[2] : ~p[2];
+	m &= (a &  4) ? p[3] : ~p[3];
+	m &= (a &  2) ? p[4] : ~p[4];
+	m &= (a &  1) ? p[5] : ~p[5];
+	return m;
+}
+
+T bcmp7(const T *p, __constant char s[])
+{
+	return (b64b(  s[0], &p[6 * 0])
+			& b64b(s[1], &p[6 * 1])
+			& b64b(s[2], &p[6 * 2])
+			& b64b(s[3], &p[6 * 3])
+			& b64b(s[4], &p[6 * 4])
+			& b64b(s[5], &p[6 * 5])
+			& b64b(s[6], &p[6 * 6]));
+}
+
+T bcmp8(const T *p, __constant char s[])
+{
+	return (b64b(  s[0], &p[6 * 0])
+			& b64b(s[1], &p[6 * 1])
+			& b64b(s[2], &p[6 * 2])
+			& b64b(s[3], &p[6 * 3])
+			& b64b(s[4], &p[6 * 4])
+			& b64b(s[5], &p[6 * 5])
+			& b64b(s[6], &p[6 * 6])
+			& b64b(s[7], &p[6 * 7]));
+}
+
+T bcmp8E(const T *p, __constant char s[])
+{
+	return (b64b(  s[0], &p[6 *  4])
+			& b64b(s[1], &p[6 *  5])
+			& b64b(s[2], &p[6 *  6])
+			& b64b(s[3], &p[6 *  7])
+			& b64b(s[4], &p[6 *  8])
+			& b64b(s[5], &p[6 *  9])
+			& b64b(s[6], &p[6 * 10])
+			& b64b(s[7], &p[6 * 11]));
+}
+
 T cmp8(T a, T b, __constant char s[])
 {
 	T s04 = ((b64e(s[0]) << 26)
@@ -696,6 +744,17 @@ T cmps(T a, T b, T c)
 			);
 }
 
+T bcmps(const T *p)
+{
+	return (0
+			|| bcmp8E(p, "Fkok1125")
+			|| bcmp8E(p, "11221122")
+			|| bcmp8(p, "/YUI.Y//")
+			|| bcmp8(p, "/./././.")
+			|| bcmp8(p, "/./././.")
+			);
+}
+
 #ifdef __OPENCL_VERSION__
 #if 1
 __kernel
@@ -723,33 +782,20 @@ void gpuMain(__global W *Ary,
 				   k[50], k[51], k[52], k[53], k[54], k[55], k[56], k[57], k[58], k[59],
 				   k[60], k[61], k[62], k[63], k[64], k[65], k[66], k[67], k[68], k[69],
 				   k[70], k[71], k[72], k[73], k[74], k[75], k[76], k[77], k[78], k[79]);
-#if 1
+#if 0
 		m >>= 1;
 		if (cmps(h[0], h[1], h[2]))
 			m |= 0x80000000;
-#else
-		a[i] = h[0];
-		b[i] = h[1];
 #endif
 	}
 
 	W x;
-#if 1
-	x = 0;
-	for (i = 0; i < 32; i++) {
-		if (0
-			)
-			x ^= 1U << i;
-	}
+#if 0
+	Ary[id] = m;
 #else
 	tr32(a, t);
-	x = t[31];
-	for (i = 1; i < 30; i++)
-		x |= t[31 - i];
-	x = ~x;
+	Ary[id] = bcmps(t);
 #endif
-
-	Ary[id] = m;
 }
 #elif 1
 __kernel
